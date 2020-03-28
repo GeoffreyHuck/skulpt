@@ -44,6 +44,7 @@ Sk.builtin.list = function (L, canSuspend) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(L)+ "' " +"object is not iterable");
     }
 
+    this["uuid"] = parseInt(Math.random() * 1000000000);
     this["v"] = this.v = v;
     return this;
 };
@@ -658,10 +659,10 @@ Sk.builtin.list.prototype["copy"] = new Sk.builtin.func(function (self) {
         k !== undefined;
         k = it.tp$iternext()) {
         items.push(k);
-    
+
     }
     return new Sk.builtin.list(items);
-    
+
 });
 
 Sk.builtin.list.prototype["reverse"] = new Sk.builtin.func(Sk.builtin.list.prototype.list_reverse_);

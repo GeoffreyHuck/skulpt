@@ -327,6 +327,7 @@ Sk.importModuleInternal_ = function (name, dumpJS, modname, suppliedPyBody, rela
                 return lines.join("\n");
             };
             finalcode = withLineNumbers(finalcode);
+            console.log(finalcode);
             Sk.debugout(finalcode);
         }
         // }

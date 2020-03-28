@@ -239,7 +239,10 @@ Sk.builtin.func = function (code, globals, closure, closure2) {
         // situations that will cause a lot of strange errors.
         throw new Error("builtin func should be called as a class with `new`");
     }
-
+    if (globals) {
+        console.log(arguments.callee.caller.name);
+        console.log(code,globals);
+    }
     var k;
     this.func_code = code;
     this.func_globals = globals || null;

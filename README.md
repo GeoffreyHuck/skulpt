@@ -1,3 +1,24 @@
+# Modified version of Skulpt for FranceIOI
+
+Each modification of a variable 
+
+    v = X
+
+is transformed to
+
+    v = window.currentPythonRunner.reportValue(X, 'v');
+
+# Development
+
+    npm run watch
+
+It updates dist/skulpt.js at every modification and put the resulting files in dist/.
+
+# Build
+
+    npm run dist
+
+
 # Welcome to Skulpt
 
 [![Join the chat at https://gitter.im/skulpt/skulpt](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/skulpt/skulpt?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)

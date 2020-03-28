@@ -3,6 +3,45 @@ var out;
 
 Sk.gensymcount = 0;
 
+function hookAffectation(mangled, dataToStore, debug) {
+    console.log("HOOK_AFFECTATION : " + debug + " [" + mangled + "     =      " + dataToStore + "]");
+
+    // FROM : $loc.varName = value;
+    // out(mangled, "=", dataToStore, ";");
+
+    // If doesn't start with $loc.
+    /*if (mangled.substr(0, 5) !== "$loc.") {
+        out(mangled, "=", dataToStore, ";");
+
+        return;
+    }*/
+
+    // TO :   $loc.varName = window.currentPythonRunner.reportValue(value, 'varName');
+    //var varName = mangled.substr(5);
+    out(mangled, "=", "window.currentPythonRunner.reportValue(", dataToStore, ", '", mangled, "');");
+}
+
+function hookGr(v, arguments) {
+    //console.log("HOOK_GR : " + debug + " [" + mangled + "     =      " + dataToStore + "]");
+
+    // FROM :
+    // out("var ", v, "=");
+    // for (i = 1; i < arguments.length; ++i) {
+    //     out(arguments[i]);
+    // }
+    // out(";");
+
+    // TO :
+
+    out("var ", v, "=");
+    for (i = 1; i < arguments.length; ++i) {
+        out(arguments[i]);
+    }
+    out(";");
+    out("console.log('"+ v + " ='," + v + ");");
+    //out("console.log('var '" + v + "'='," + arguments + ")");
+}
+
 /**
  * @constructor
  * @param {string} filename
@@ -301,11 +340,7 @@ Compiler.prototype._gr = function (hint, rest) {
     var i;
     var v = this.gensym(hint);
     this.u.localtemps.push(v);
-    out("var ", v, "=");
-    for (i = 1; i < arguments.length; ++i) {
-        out(arguments[i]);
-    }
-    out(";");
+    hookGr(v, arguments);
     return v;
 };
 
@@ -371,7 +406,7 @@ Compiler.prototype._checkSuspension = function(e) {
 
         e = e || {lineno: "$currLineNo", col_offset: "$currColNo"};
 
-        out ("if ($ret && $ret.$isSuspension) { return $saveSuspension($ret,'"+this.filename+"',"+e.lineno+","+e.col_offset+"); }");
+        out ("if ($ret && $ret.$isSuspension) { console.log('saveSuspension'); return $saveSuspension($ret,'"+this.filename+"',"+e.lineno+","+e.col_offset+"); }");
 
         this.u.doesSuspend = true;
         this.u.tempsToSave = this.u.tempsToSave.concat(this.u.localtemps);
@@ -586,7 +621,7 @@ Compiler.prototype.cyield = function(e)
     }
     nextBlock = this.newBlock("after yield");
     // return a pair: resume target block and yielded value
-    out("return [/*resume*/", nextBlock, ",/*ret*/", val, "];");
+    out(" console.log('cyield return'); return [/*resume*/", nextBlock, ",/*ret*/", val, "];");
     this.setBlock(nextBlock);
     return "$gen.gi$sentvalue"; // will either be null if none sent, or the value from gen.send(value)
 };
@@ -667,8 +702,10 @@ Compiler.prototype.ccall = function (e) {
     if (keywordArgs !== "undefined") {
         out("$ret = Sk.misceval.applyOrSuspend(",func,",undefined,undefined,",keywordArgs,",",positionalArgs,");");
     } else if (positionalArgs != "[]") {
+        out("console.log('ENTER callsimOrSuspendArray','" + func + "'," + func + "," + positionalArgs + ");");
         out ("$ret = Sk.misceval.callsimOrSuspendArray(", func, ", ", positionalArgs, ");");
     } else {
+        out("console.log('ENTEER callsimOrSuspendArray','" + func + "'," + func + ");");
         out ("$ret = Sk.misceval.callsimOrSuspendArray(", func, ");");
     }
 
@@ -888,11 +925,13 @@ Compiler.prototype.vexpr = function (e, data, augvar, augsubs) {
                     out("$ret = undefined;");
                     out("if(", data, "!==undefined){");
                     out("$ret = Sk.abstr.sattr(", augvar, ",", mname, ",", data, ", true);");
+                    out("console.log('AugStore ret ',$ret);");
                     out("}");
                     this._checkSuspension(e);
                     break;
                 case Sk.astnodes.Store:
                     out("$ret = Sk.abstr.sattr(", val, ",", mname, ",", data, ", true);");
+                    out("console.log('Store ret ',$ret);");
                     this._checkSuspension(e);
                     break;
                 case Sk.astnodes.Del:
@@ -1122,11 +1161,28 @@ Compiler.prototype.outputSuspensionHelpers = function (unit) {
     var localsToSave = unit.localnames.concat(unit.tempsToSave);
     var seenTemps = {};
     var hasCell = unit.ste.blockType === Sk.SYMTAB_CONSTS.FunctionBlock && unit.ste.childHasFree;
+
+    var saveFunctionName = "";
+    var wakeFunctionName = "";
+    if (unit.hasOwnProperty("name") && unit.name) {
+        saveFunctionName = "susp._name='" + unit.name.v + "'; ";
+    }
+    var saveFunctionArgNames = "susp._argnames=[]; ";
+    var wakeFunctionArgNames = "";
+    if (unit.hasOwnProperty("argnames") && unit.argnames) {
+        var uniqueNames = unit.argnames.filter(function(value, index, self) {
+            return self.indexOf(value) === index;
+        });
+
+        saveFunctionArgNames = "susp._argnames=[" + uniqueNames.map((name) => '"' + name + '"') + "]; ";
+    }
+
     var output = (localsToSave.length > 0 ? ("var " + localsToSave.join(",") + ";") : "") +
                  "var $wakeFromSuspension = function() {" +
                     "var susp = "+unit.scopename+".$wakingSuspension; "+unit.scopename+".$wakingSuspension = undefined;" +
                     "$blk=susp.$blk; $loc=susp.$loc; $gbl=susp.$gbl; $exc=susp.$exc; $err=susp.$err; $postfinally=susp.$postfinally;" +
-                    "$currLineNo=susp.$lineno; $currColNo=susp.$colno; Sk.lastYield=Date.now();" +
+                    "$currLineNo=susp.$lineno; $currColNo=susp.$colno; Sk.lastYield=Date.now(); " +
+                    wakeFunctionName + wakeFunctionArgNames +
                     (hasCell?"$cell=susp.$cell;":"");
 
     for (i = 0; i < localsToSave.length; i++) {
@@ -1146,6 +1202,7 @@ Compiler.prototype.outputSuspensionHelpers = function (unit) {
                 "susp.data=susp.child.data;susp.$blk=$blk;susp.$loc=$loc;susp.$gbl=$gbl;susp.$exc=$exc;susp.$err=$err;susp.$postfinally=$postfinally;" +
                 "susp.$filename=$filename;susp.$lineno=$lineno;susp.$colno=$colno;" +
                 "susp.optional=susp.child.optional;" +
+                saveFunctionName + saveFunctionArgNames +
                 (hasCell ? "susp.$cell=$cell;" : "");
 
     seenTemps = {};
@@ -2124,7 +2181,7 @@ Compiler.prototype.clambda = function (e) {
     Sk.asserts.assert(e instanceof Sk.astnodes.Lambda);
     func = this.buildcodeobj(e, new Sk.builtin.str("<lambda>"), null, e.args, function (scopename) {
         var val = this.vexpr(e.body);
-        out("return ", val, ";");
+        out("console.log('clambda return'); return ", val, ";");
     });
     return func;
 };
@@ -2361,7 +2418,7 @@ Compiler.prototype.vstmt = function (s, class_for_super) {
             }
             val = s.value ? this.vexpr(s.value) : "Sk.builtin.none.none$";
             if (this.u.finallyBlocks.length == 0) {
-                out("return ", val, ";");
+                out("console.log('astnode return'); return ", val, ";");
             } else {
                 out("$postfinally={returning:",val,"};");
                 this._jump(this.peekFinallyBlock().blk);
@@ -2530,7 +2587,8 @@ Compiler.prototype.nameop = function (name, ctx, dataToStore) {
                     out("if (", mangled, " === undefined) { throw new Sk.builtin.UnboundLocalError('local variable \\\'", mangled, "\\\' referenced before assignment'); }\n");
                     return mangled;
                 case Sk.astnodes.Store:
-                    out(mangled, "=", dataToStore, ";");
+                    // out(mangled, "=", dataToStore, ";");
+                    hookAffectation(mangled, dataToStore, '1');
                     break;
                 case Sk.astnodes.Del:
                     out("delete ", mangled, ";");
@@ -2545,7 +2603,8 @@ Compiler.prototype.nameop = function (name, ctx, dataToStore) {
                     // can't be || for loc.x = 0 or null
                     return this._gr("loadname", mangled, "!==undefined?", mangled, ":Sk.misceval.loadname('", mangledNoPre, "',$gbl);");
                 case Sk.astnodes.Store:
-                    out(mangled, "=", dataToStore, ";");
+                    // out(mangled, "=", dataToStore, ";");
+                    hookAffectation(mangled, dataToStore, '2');
                     break;
                 case Sk.astnodes.Del:
                     out("delete ", mangled, ";");
@@ -2561,7 +2620,8 @@ Compiler.prototype.nameop = function (name, ctx, dataToStore) {
                 case Sk.astnodes.Load:
                     return this._gr("loadgbl", "Sk.misceval.loadname('", mangledNoPre, "',$gbl)");
                 case Sk.astnodes.Store:
-                    out("$gbl.", mangledNoPre, "=", dataToStore, ";");
+                    // out("$gbl.", mangledNoPre, "=", dataToStore, ";");
+                    hookAffectation("$gbl." + mangledNoPre, dataToStore, '3');
                     break;
                 case Sk.astnodes.Del:
                     out("delete $gbl.", mangledNoPre);
@@ -2575,7 +2635,8 @@ Compiler.prototype.nameop = function (name, ctx, dataToStore) {
                 case Sk.astnodes.Load:
                     return dict + "." + mangledNoPre;
                 case Sk.astnodes.Store:
-                    out(dict, ".", mangledNoPre, "=", dataToStore, ";");
+                    // out(dict, ".", mangledNoPre, "=", dataToStore, ";");
+                    hookAffectation(dict + "." + mangledNoPre, dataToStore, '4');
                     break;
                 case Sk.astnodes.Param:
                     return mangledNoPre;
@@ -2740,7 +2801,7 @@ Compiler.prototype.cmod = function (mod) {
     switch (mod.constructor) {
         case Sk.astnodes.Module:
             this.cbody(mod.body);
-            out("return $loc;");
+            out("console.log('cmod ast return'); return $loc;");
             break;
         default:
             Sk.asserts.fail("todo; unhandled case in compilerMod");

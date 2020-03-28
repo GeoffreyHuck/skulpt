@@ -42,7 +42,7 @@ Sk.python2 = {
     bankers_rounding: false,
     python_version: false,
     dunder_next: false,
-    dunder_round: false,    
+    dunder_round: false,
     list_clear: false,
     exceptions: false,
     no_long_type: false,
@@ -287,6 +287,7 @@ Sk.inBrowser = Sk.global["document"] !== undefined;
  * @param {...} args
  */
 Sk.debugout = function (args) {
+
 };
 
 (function () {
