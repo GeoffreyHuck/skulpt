@@ -18,11 +18,17 @@ function hookAffectation(mangled, dataToStore, debug) {
 
     // TO :   $loc.varName = window.currentPythonRunner.reportValue(value, 'varName');
     //var varName = mangled.substr(5);
-    out(mangled, "=", "window.currentPythonRunner.reportValue(", dataToStore, ", '", mangled, "');");
+    out(mangled, "=", "window.currentPythonRunner.reportValue(Sk.builtin.persistentCopy(", mangled, ", ", dataToStore, "), '", mangled, "');");
 }
 
 function hookGr(v, arguments) {
-    //console.log("HOOK_GR : " + debug + " [" + mangled + "     =      " + dataToStore + "]");
+    /*
+    var args = "";
+    for (i = 1; i < arguments.length; ++i) {
+        args += " " + arguments[i] + ", ";
+    }
+    console.log("HOOK_GR : " + v + "  = " + args);
+    */
 
     // FROM :
     // out("var ", v, "=");
@@ -778,7 +784,11 @@ Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
         return this._gr("lsubscr", "$ret");
     }
     else if (ctx === Sk.astnodes.Store || ctx === Sk.astnodes.AugStore) {
+        //out("_newRef = Sk.builting.persistentCopy(", obj, " ,", obj, ")");
+        out(obj, " = ", obj, ".clone();");
         out("$ret = Sk.abstr.objectSetItem(", obj, ",", subs, ",", data, ", true);");
+        //out("console.log($ret);")
+        //out(obj, " = Sk.builting.persistentCopy()
         this._checkSuspension();
     }
     else if (ctx === Sk.astnodes.Del) {

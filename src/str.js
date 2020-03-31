@@ -65,6 +65,7 @@ Sk.builtin.str = function (x) {
     return this;
 
 };
+
 Sk.exportSymbol("Sk.builtin.str", Sk.builtin.str);
 
 Sk.abstr.setUpInheritance("str", Sk.builtin.str, Sk.builtin.seqtype);
@@ -862,6 +863,10 @@ Sk.builtin.str.prototype["isupper"] = new Sk.builtin.func(function (self) {
     return new Sk.builtin.bool( self.v.length && !/[a-z]/.test(self.v) && /[A-Z]/.test(self.v));
 });
 
+Sk.builtin.str.prototype["clone"] = function() {
+    return new Sk.builtin.str(this.v);
+};
+
 Sk.builtin.str.prototype["istitle"] = new Sk.builtin.func(function (self) {
     // Comparing to str.title() seems the most intuitive thing, but it fails on "",
     // Other empty-ish strings with no change.
@@ -1099,7 +1104,7 @@ Sk.builtin.str.prototype.nb$remainder = function (rhs) {
             }
             convName = ["toExponential", "toFixed", "toPrecision"]["efg".indexOf(conversionType.toLowerCase())];
             if (precision === undefined || precision === "") {
-                
+
                 if (conversionType === "e" || conversionType === "E") {
                     precision = 6;
                 } else if (conversionType === "f" || conversionType === "F") {
@@ -1122,7 +1127,7 @@ Sk.builtin.str.prototype.nb$remainder = function (rhs) {
                 if ((result.length >= 7) && (result.slice(0, 6) == "0.0000")) {
 
                     val = parseFloat(result);
-                    result = val.toExponential(); 
+                    result = val.toExponential();
                 }
                 if (result.charAt(result.length -2) == "-") {
                     result = result.slice(0, result.length - 1) + "0" + result.charAt(result.length - 1);
