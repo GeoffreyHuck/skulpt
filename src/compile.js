@@ -1163,12 +1163,10 @@ Compiler.prototype.outputSuspensionHelpers = function (unit) {
     var hasCell = unit.ste.blockType === Sk.SYMTAB_CONSTS.FunctionBlock && unit.ste.childHasFree;
 
     var saveFunctionName = "";
-    var wakeFunctionName = "";
     if (unit.hasOwnProperty("name") && unit.name) {
         saveFunctionName = "susp._name='" + unit.name.v + "'; ";
     }
     var saveFunctionArgNames = "susp._argnames=[]; ";
-    var wakeFunctionArgNames = "";
     if (unit.hasOwnProperty("argnames") && unit.argnames) {
         var uniqueNames = unit.argnames.filter(function(value, index, self) {
             return self.indexOf(value) === index;
@@ -1176,13 +1174,16 @@ Compiler.prototype.outputSuspensionHelpers = function (unit) {
 
         saveFunctionArgNames = "susp._argnames=[" + uniqueNames.map((name) => '"' + name + '"') + "]; ";
     }
+    var saveScopeName = "";
+    if (unit.hasOwnProperty('scopename') && unit.scopename) {
+        saveScopeName = "susp._scopename='" + unit.scopename + "'; ";
+    }
 
     var output = (localsToSave.length > 0 ? ("var " + localsToSave.join(",") + ";") : "") +
                  "var $wakeFromSuspension = function() {" +
                     "var susp = "+unit.scopename+".$wakingSuspension; "+unit.scopename+".$wakingSuspension = undefined;" +
                     "$blk=susp.$blk; $loc=susp.$loc; $gbl=susp.$gbl; $exc=susp.$exc; $err=susp.$err; $postfinally=susp.$postfinally;" +
                     "$currLineNo=susp.$lineno; $currColNo=susp.$colno; Sk.lastYield=Date.now(); " +
-                    wakeFunctionName + wakeFunctionArgNames +
                     (hasCell?"$cell=susp.$cell;":"");
 
     for (i = 0; i < localsToSave.length; i++) {
@@ -1202,7 +1203,7 @@ Compiler.prototype.outputSuspensionHelpers = function (unit) {
                 "susp.data=susp.child.data;susp.$blk=$blk;susp.$loc=$loc;susp.$gbl=$gbl;susp.$exc=$exc;susp.$err=$err;susp.$postfinally=$postfinally;" +
                 "susp.$filename=$filename;susp.$lineno=$lineno;susp.$colno=$colno;" +
                 "susp.optional=susp.child.optional;" +
-                saveFunctionName + saveFunctionArgNames +
+                saveFunctionName + saveFunctionArgNames + saveScopeName +
                 (hasCell ? "susp.$cell=$cell;" : "");
 
     seenTemps = {};
