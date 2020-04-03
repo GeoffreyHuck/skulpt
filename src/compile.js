@@ -4,7 +4,7 @@ var out;
 Sk.gensymcount = 0;
 
 function hookAffectation(mangled, dataToStore, debug) {
-    console.log("HOOK_AFFECTATION : " + debug + " [" + mangled + "     =      " + dataToStore + "]");
+    // console.log("HOOK_AFFECTATION : " + debug + " [" + mangled + "     =      " + dataToStore + "]");
 
     // FROM : $loc.varName = value;
     // out(mangled, "=", dataToStore, ";");
@@ -18,7 +18,8 @@ function hookAffectation(mangled, dataToStore, debug) {
 
     // TO :   $loc.varName = window.currentPythonRunner.reportValue(value, 'varName');
     //var varName = mangled.substr(5);
-    out(mangled, "=", "window.currentPythonRunner.reportValue(Sk.builtin.persistentCopy(", mangled, ", ", dataToStore, "), '", mangled, "');");
+    // out(mangled, "=", "window.currentPythonRunner.reportValue(Sk.builtin.persistentCopy(", mangled, ", ", dataToStore, "), '", mangled, "');");
+    out(mangled, "=", "window.currentPythonRunner.reportValue(", dataToStore, ", '", mangled, "');");
 }
 
 function hookGr(v, arguments) {
@@ -44,7 +45,6 @@ function hookGr(v, arguments) {
         out(arguments[i]);
     }
     out(";");
-    out("console.log('"+ v + " ='," + v + ");");
     //out("console.log('var '" + v + "'='," + arguments + ")");
 }
 
@@ -72,6 +72,9 @@ function Compiler (filename, st, flags, canSuspend, sourceCodeForAnnotation) {
     // this.gensymcount = 0;
 
     this.allUnits = [];
+
+    this.localReferencesToUpdateForPersistantVariables = [];
+    // this.localReferencesToUpdateWihoutOldValueVariables = [];
 
     this.source = sourceCodeForAnnotation ? sourceCodeForAnnotation.split("\n") : false;
 }
@@ -346,7 +349,18 @@ Compiler.prototype._gr = function (hint, rest) {
     var i;
     var v = this.gensym(hint);
     this.u.localtemps.push(v);
+
     hookGr(v, arguments);
+
+    if (this.filename === "<stdin>.py") {
+        if (rest.substr(0, 5) === "$loc.") {
+            this.localReferencesToUpdateForPersistantVariables.push({
+                localName: rest,
+                ref: v
+            });
+        }
+    }
+
     return v;
 };
 
@@ -412,6 +426,7 @@ Compiler.prototype._checkSuspension = function(e) {
 
         e = e || {lineno: "$currLineNo", col_offset: "$currColNo"};
 
+        this.endBlockHook();
         out ("if ($ret && $ret.$isSuspension) { console.log('saveSuspension'); return $saveSuspension($ret,'"+this.filename+"',"+e.lineno+","+e.col_offset+"); }");
 
         this.u.doesSuspend = true;
@@ -708,10 +723,10 @@ Compiler.prototype.ccall = function (e) {
     if (keywordArgs !== "undefined") {
         out("$ret = Sk.misceval.applyOrSuspend(",func,",undefined,undefined,",keywordArgs,",",positionalArgs,");");
     } else if (positionalArgs != "[]") {
-        out("console.log('ENTER callsimOrSuspendArray','" + func + "'," + func + "," + positionalArgs + ");");
+        // out("console.log('ENTER callsimOrSuspendArray','" + func + "'," + func + "," + positionalArgs + ");");
         out ("$ret = Sk.misceval.callsimOrSuspendArray(", func, ", ", positionalArgs, ");");
     } else {
-        out("console.log('ENTEER callsimOrSuspendArray','" + func + "'," + func + ");");
+        // out("console.log('ENTEER callsimOrSuspendArray','" + func + "'," + func + ");");
         out ("$ret = Sk.misceval.callsimOrSuspendArray(", func, ");");
     }
 
@@ -935,13 +950,13 @@ Compiler.prototype.vexpr = function (e, data, augvar, augsubs) {
                     out("$ret = undefined;");
                     out("if(", data, "!==undefined){");
                     out("$ret = Sk.abstr.sattr(", augvar, ",", mname, ",", data, ", true);");
-                    out("console.log('AugStore ret ',$ret);");
+                    // out("console.log('AugStore ret ',$ret);");
                     out("}");
                     this._checkSuspension(e);
                     break;
                 case Sk.astnodes.Store:
                     out("$ret = Sk.abstr.sattr(", val, ",", mname, ",", data, ", true);");
-                    out("console.log('Store ret ',$ret);");
+                    // out("console.log('Store ret ',$ret);");
                     this._checkSuspension(e);
                     break;
                 case Sk.astnodes.Del:
@@ -1190,11 +1205,17 @@ Compiler.prototype.outputSuspensionHelpers = function (unit) {
     }
 
     var output = (localsToSave.length > 0 ? ("var " + localsToSave.join(",") + ";") : "") +
-                 "var $wakeFromSuspension = function() {" +
-                    "var susp = "+unit.scopename+".$wakingSuspension; "+unit.scopename+".$wakingSuspension = undefined;" +
-                    "$blk=susp.$blk; $loc=susp.$loc; $gbl=susp.$gbl; $exc=susp.$exc; $err=susp.$err; $postfinally=susp.$postfinally;" +
-                    "$currLineNo=susp.$lineno; $currColNo=susp.$colno; Sk.lastYield=Date.now(); " +
-                    (hasCell?"$cell=susp.$cell;":"");
+         "var $wakeFromSuspension = function() {" +
+         "var susp = "+unit.scopename+".$wakingSuspension; "+unit.scopename+".$wakingSuspension = undefined;";
+    output +=  "$blk=susp.$blk; ";
+
+    // output += " $loc={...susp.$loc}; $gbl=susp.$gbl; ";
+    output += " $loc=susp.$loc; $gbl=susp.$gbl; ";
+    // output += "if (susp._name === '<module>') { $loc=susp.$loc; $gbl=susp.$gbl; } else { $loc={...susp.$loc}; $gbl=susp.$gbl; }";
+
+    output += " $exc=susp.$exc; $err=susp.$err; $postfinally=susp.$postfinally;" +
+         "$currLineNo=susp.$lineno; $currColNo=susp.$colno; Sk.lastYield=Date.now(); " +
+         (hasCell?"$cell=susp.$cell;":"");
 
     for (i = 0; i < localsToSave.length; i++) {
         t = localsToSave[i];
@@ -1307,6 +1328,7 @@ Compiler.prototype.cif = function (s) {
         if (s.orelse && s.orelse.length > 0) {
             this._jumpfalse(test, next);
             this.vseqstmt(s.body);
+
             this._jump(end);
 
             this.setBlock(next);
@@ -1354,6 +1376,7 @@ Compiler.prototype.cwhile = function (s) {
         if ((Sk.debugging || Sk.killableWhile) && this.u.canSuspend) {
             var suspType = 'Sk.delay';
             var debugBlock = this.newBlock("debug breakpoint for line "+s.lineno);
+            this.endBlockHook();
             out("if (Sk.breakpoints('"+this.filename+"',"+s.lineno+","+s.col_offset+")) {",
                 "var $susp = $saveSuspension({data: {type: '"+suspType+"'}, resume: function() {}}, '"+this.filename+"',"+s.lineno+","+s.col_offset+");",
                 "$susp.$blk = "+debugBlock+";",
@@ -1423,6 +1446,7 @@ Compiler.prototype.cfor = function (s) {
     if ((Sk.debugging || Sk.killableFor) && this.u.canSuspend) {
         var suspType = 'Sk.delay';
         var debugBlock = this.newBlock("debug breakpoint for line "+s.lineno);
+        this.endBlockHook();
         out("if (Sk.breakpoints('"+this.filename+"',"+s.lineno+","+s.col_offset+")) {",
             "var $susp = $saveSuspension({data: {type: '"+suspType+"'}, resume: function() {}}, '"+this.filename+"',"+s.lineno+","+s.col_offset+");",
             "$susp.$blk = "+debugBlock+";",
@@ -2403,6 +2427,7 @@ Compiler.prototype.vstmt = function (s, class_for_super) {
 
     if (Sk.debugging && this.u.canSuspend) {
         debugBlock = this.newBlock("debug breakpoint for line "+s.lineno);
+
         out("if (Sk.breakpoints('"+this.filename+"',"+s.lineno+","+s.col_offset+")) {",
             "var $susp = $saveSuspension({data: {type: 'Sk.debug'}, resume: function() {}}, '"+this.filename+"',"+s.lineno+","+s.col_offset+");",
             "$susp.$blk = " + debugBlock + ";",
@@ -2492,6 +2517,8 @@ Compiler.prototype.vstmt = function (s, class_for_super) {
         default:
             Sk.asserts.fail("unhandled case in vstmt: " + JSON.stringify(s));
     }
+
+    // out("console.log('end of vstmt');");
 };
 
 Compiler.prototype.vseqstmt = function (stmts) {
@@ -2612,6 +2639,7 @@ Compiler.prototype.nameop = function (name, ctx, dataToStore) {
             switch (ctx) {
                 case Sk.astnodes.Load:
                     // can't be || for loc.x = 0 or null
+
                     return this._gr("loadname", mangled, "!==undefined?", mangled, ":Sk.misceval.loadname('", mangledNoPre, "',$gbl);");
                 case Sk.astnodes.Store:
                     // out(mangled, "=", dataToStore, ";");
@@ -2774,7 +2802,8 @@ Compiler.prototype.cmod = function (mod) {
         this.u.varDeclsCode += "if (typeof Sk.lastYield === 'undefined') {Sk.lastYield = Date.now()}";
     }
 
-    this.u.varDeclsCode += "if ("+modf+".$wakingSuspension!==undefined) { $wakeFromSuspension(); }" +
+    // TODO: Check here.
+    this.u.varDeclsCode += "if ("+modf+".$wakingSuspension!==undefined) { $wakeFromSuspension(); }"; +
         "if (Sk.retainGlobals) {" +
         "    if (Sk.globals) { $gbl = Sk.globals; Sk.globals = $gbl; $loc = $gbl; }" +
         "    if (Sk.globals) { $gbl = Sk.globals; Sk.globals = $gbl; $loc = $gbl; $loc.__file__=new Sk.builtins.str('" + this.filename + "');}" +
@@ -2823,6 +2852,28 @@ Compiler.prototype.cmod = function (mod) {
     return modf;
 };
 
+Compiler.prototype.endBlockHook = function() {
+    // for (let idx in this.localReferencesToUpdateWihoutOldValueVariables) {
+    //     const localName = this.localReferencesToUpdateWihoutOldValueVariables[idx].localName;
+    //     const ref = this.localReferencesToUpdateWihoutOldValueVariables[idx].ref;
+    //
+    //     out(localName + " = Sk.builtin.removeOldValues(" + localName + "); ");
+    // }
+    // this.localReferencesToUpdateWihoutOldValueVariables = [];
+
+    for (let idx in this.localReferencesToUpdateForPersistantVariables) {
+        const localName = this.localReferencesToUpdateForPersistantVariables[idx].localName;
+        const ref = this.localReferencesToUpdateForPersistantVariables[idx].ref;
+
+        out(localName + " = " + ref + "; ");
+
+        // this.localReferencesToUpdateWihoutOldValueVariables.push({
+        //     localName: localName
+        // });
+    }
+    this.localReferencesToUpdateForPersistantVariables = [];
+};
+
 /**
  * @param {string} source the code
  * @param {string} filename where it came from
@@ -2852,7 +2903,12 @@ Sk.compile = function (source, filename, mode, canSuspend) {
     // Restore the global __future__ flags
     Sk.__future__ = savedFlags;
 
-    var ret = "$compiledmod = function() {" + c.result.join("") + "\nreturn " + funcname + ";}();";
+    var ret = "";
+    if (this.filename !== "<stdin>.py") {
+        //ret = "debugger;";
+    }
+    ret += "$compiledmod = function() {" + c.result.join("") + "\nreturn " + funcname + ";}();";
+
     return {
         funcname: "$compiledmod",
         code    : ret

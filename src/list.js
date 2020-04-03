@@ -117,7 +117,8 @@ Sk.builtin.list.prototype.list_ass_item_ = function (i, v) {
         throw new Sk.builtin.IndexError("list assignment index out of range");
     }
 
-    this.v[i] = Sk.builtin.persistentCopy(v, this.v[i]);
+    // this.v[i] = Sk.builtin.persistentCopy(this.v[i], v);
+    this.v[i] = v;
 };
 
 Sk.builtin.list.prototype.list_ass_slice_ = function (ilow, ihigh, v) {
@@ -335,8 +336,6 @@ Sk.builtin.list.prototype.list_subscript_ = function (index) {
 };
 
 Sk.builtin.list.prototype.list_ass_subscript_ = function (index, value) {
-    const newList = this.clone();
-
     var i;
     var j;
     var tosub;
@@ -345,18 +344,18 @@ Sk.builtin.list.prototype.list_ass_subscript_ = function (index, value) {
         i = Sk.misceval.asIndex(index);
         if (i !== undefined) {
             if (i < 0) {
-                i = newList.v.length + i;
+                i = this.v.length + i;
             }
-            newList.list_ass_item_(i, value);
+            this.list_ass_item_(i, value);
             return;
         }
     } else if (index instanceof Sk.builtin.slice) {
-        indices = index.slice_indices_(newList.v.length);
+        indices = index.slice_indices_(this.v.length);
         if (indices[2] === 1) {
-            newList.list_ass_slice_(indices[0], indices[1], value);
+            this.list_ass_slice_(indices[0], indices[1], value);
         } else {
             tosub = [];
-            index.sssiter$(newList, function (i, wrt) {
+            index.sssiter$(this, function (i, wrt) {
                 tosub.push(i);
             });
             j = 0;
@@ -364,7 +363,7 @@ Sk.builtin.list.prototype.list_ass_subscript_ = function (index, value) {
                 throw new Sk.builtin.ValueError("attempt to assign sequence of size " + value.v.length + " to extended slice of size " + tosub.length);
             }
             for (i = 0; i < tosub.length; ++i) {
-                newList.v.splice(tosub[i], 1, value.v[j]);
+                this.v.splice(tosub[i], 1, value.v[j]);
                 j += 1;
             }
         }
@@ -673,6 +672,7 @@ Sk.builtin.list.prototype["clone"] = function() {
     for (let it = Sk.abstr.iter(this), k = it.tp$iternext();
         k !== undefined;
         k = it.tp$iternext()) {
+        //items.push(k.clone());
         items.push(k);
     }
 
