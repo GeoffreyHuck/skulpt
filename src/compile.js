@@ -74,6 +74,7 @@ function Compiler (filename, st, flags, canSuspend, sourceCodeForAnnotation) {
     this.allUnits = [];
 
     this.localReferencesToUpdateForPersistantVariables = [];
+    //this.localReferencesModified = false;
     // this.localReferencesToUpdateWihoutOldValueVariables = [];
 
     this.source = sourceCodeForAnnotation ? sourceCodeForAnnotation.split("\n") : false;
@@ -352,13 +353,11 @@ Compiler.prototype._gr = function (hint, rest) {
 
     hookGr(v, arguments);
 
-    if (this.filename === "<stdin>.py") {
-        if (rest.substr(0, 5) === "$loc.") {
-            this.localReferencesToUpdateForPersistantVariables.push({
-                localName: rest,
-                ref: v
-            });
-        }
+    if (rest.substr(0, 5) === "$loc.") {
+        this.localReferencesToUpdateForPersistantVariables.push({
+            localName: rest,
+            ref: v
+        });
     }
 
     return v;
@@ -426,7 +425,6 @@ Compiler.prototype._checkSuspension = function(e) {
 
         e = e || {lineno: "$currLineNo", col_offset: "$currColNo"};
 
-        this.endBlockHook();
         out ("if ($ret && $ret.$isSuspension) { console.log('saveSuspension'); return $saveSuspension($ret,'"+this.filename+"',"+e.lineno+","+e.col_offset+"); }");
 
         this.u.doesSuspend = true;
@@ -793,17 +791,45 @@ Compiler.prototype.vslice = function (s, ctx, obj, dataToStore) {
 };
 
 Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
+    if (this.filename === "<stdin>.py") {
+        //debugger;
+    }
+
     if (ctx === Sk.astnodes.Load || ctx === Sk.astnodes.AugLoad) {
+        this.localReferencesToUpdateForPersistantVariables.unshift({
+            localName: obj,
+            index: subs
+        });
+
         out("$ret = Sk.abstr.objectGetItem(", obj, ",", subs, ", true);");
         this._checkSuspension();
         return this._gr("lsubscr", "$ret");
     }
     else if (ctx === Sk.astnodes.Store || ctx === Sk.astnodes.AugStore) {
-        //out("_newRef = Sk.builting.persistentCopy(", obj, " ,", obj, ")");
         out(obj, " = ", obj, ".clone();");
+
         out("$ret = Sk.abstr.objectSetItem(", obj, ",", subs, ",", data, ", true);");
-        //out("console.log($ret);")
-        //out(obj, " = Sk.builting.persistentCopy()
+
+        debugger;
+        for (let idx in this.localReferencesToUpdateForPersistantVariables) {
+            const localName = this.localReferencesToUpdateForPersistantVariables[idx].localName;
+            if (this.localReferencesToUpdateForPersistantVariables[idx].hasOwnProperty("ref")) {
+                const ref = this.localReferencesToUpdateForPersistantVariables[idx].ref;
+
+                out(localName, " = " + ref + ";");
+            } else {
+                const index = this.localReferencesToUpdateForPersistantVariables[idx].index;
+
+                out(localName, " = ", localName, ".clone();");
+
+                var lastObj = obj;
+                if (idx > 0) {
+                    lastObj = this.localReferencesToUpdateForPersistantVariables[idx - 1].localName;
+                }
+                out("Sk.abstr.objectSetItem(", localName, ",", index, ",", lastObj, ", true);");
+            }
+        }
+
         this._checkSuspension();
     }
     else if (ctx === Sk.astnodes.Del) {
@@ -984,6 +1010,10 @@ Compiler.prototype.vexpr = function (e, data, augvar, augsubs) {
 
                     out("$ret=undefined;");
                     out("if(", data, "!==undefined){");
+                    if (this.filename === "<stdin>.py") {
+                        //this.localReferencesModified = true;
+                        //debugger;
+                    }
                     out("$ret=Sk.abstr.objectSetItem(",augvar,",",augsubs,",",data,", true)");
                     out("}");
                     this._checkSuspension(e);
@@ -1376,7 +1406,6 @@ Compiler.prototype.cwhile = function (s) {
         if ((Sk.debugging || Sk.killableWhile) && this.u.canSuspend) {
             var suspType = 'Sk.delay';
             var debugBlock = this.newBlock("debug breakpoint for line "+s.lineno);
-            this.endBlockHook();
             out("if (Sk.breakpoints('"+this.filename+"',"+s.lineno+","+s.col_offset+")) {",
                 "var $susp = $saveSuspension({data: {type: '"+suspType+"'}, resume: function() {}}, '"+this.filename+"',"+s.lineno+","+s.col_offset+");",
                 "$susp.$blk = "+debugBlock+";",
@@ -1446,7 +1475,6 @@ Compiler.prototype.cfor = function (s) {
     if ((Sk.debugging || Sk.killableFor) && this.u.canSuspend) {
         var suspType = 'Sk.delay';
         var debugBlock = this.newBlock("debug breakpoint for line "+s.lineno);
-        this.endBlockHook();
         out("if (Sk.breakpoints('"+this.filename+"',"+s.lineno+","+s.col_offset+")) {",
             "var $susp = $saveSuspension({data: {type: '"+suspType+"'}, resume: function() {}}, '"+this.filename+"',"+s.lineno+","+s.col_offset+");",
             "$susp.$blk = "+debugBlock+";",
@@ -2417,6 +2445,9 @@ Compiler.prototype.cbreak = function (s) {
  * @param {Sk.builtin.str=} class_for_super
  */
 Compiler.prototype.vstmt = function (s, class_for_super) {
+    //this.localReferencesModified = false;
+    this.localReferencesToUpdateForPersistantVariables = [];
+
     var i;
     var val;
     var n;
@@ -2850,28 +2881,6 @@ Compiler.prototype.cmod = function (mod) {
 
     this.result.push(this.outputAllUnits());
     return modf;
-};
-
-Compiler.prototype.endBlockHook = function() {
-    // for (let idx in this.localReferencesToUpdateWihoutOldValueVariables) {
-    //     const localName = this.localReferencesToUpdateWihoutOldValueVariables[idx].localName;
-    //     const ref = this.localReferencesToUpdateWihoutOldValueVariables[idx].ref;
-    //
-    //     out(localName + " = Sk.builtin.removeOldValues(" + localName + "); ");
-    // }
-    // this.localReferencesToUpdateWihoutOldValueVariables = [];
-
-    for (let idx in this.localReferencesToUpdateForPersistantVariables) {
-        const localName = this.localReferencesToUpdateForPersistantVariables[idx].localName;
-        const ref = this.localReferencesToUpdateForPersistantVariables[idx].ref;
-
-        out(localName + " = " + ref + "; ");
-
-        // this.localReferencesToUpdateWihoutOldValueVariables.push({
-        //     localName: localName
-        // });
-    }
-    this.localReferencesToUpdateForPersistantVariables = [];
 };
 
 /**
