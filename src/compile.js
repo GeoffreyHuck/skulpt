@@ -810,7 +810,6 @@ Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
 
         out("$ret = Sk.abstr.objectSetItem(", obj, ",", subs, ",", data, ", true);");
 
-        debugger;
         for (let idx in this.localReferencesToUpdateForPersistantVariables) {
             const localName = this.localReferencesToUpdateForPersistantVariables[idx].localName;
             if (this.localReferencesToUpdateForPersistantVariables[idx].hasOwnProperty("ref")) {
