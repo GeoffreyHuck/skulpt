@@ -37,7 +37,7 @@ Sk.builtin.persistentCopy = function (currentValue, newValue) {
  *
  * @param value The value.
  *
- * @returns {[]|*} A new value without the ._old properties.
+ * @returns {*} A new value without the ._old properties.
  */
 Sk.builtin.removeOldValues = function(value) {
     if (Array.isArray(value)) {

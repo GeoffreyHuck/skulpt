@@ -10,19 +10,19 @@ function hookAffectation(mangled, dataToStore, debug) {
     // out(mangled, "=", dataToStore, ";");
 
     // If doesn't start with $loc.
-    /*if (mangled.substr(0, 5) !== "$loc.") {
+    if (mangled.substr(0, 5) !== "$loc.") {
         out(mangled, "=", dataToStore, ";");
 
         return;
-    }*/
+    }
 
     // TO :   $loc.varName = window.currentPythonRunner.reportValue(value, 'varName');
-    //var varName = mangled.substr(5);
+    var varName = mangled.substr(5);
     // out(mangled, "=", "window.currentPythonRunner.reportValue(Sk.builtin.persistentCopy(", mangled, ", ", dataToStore, "), '", mangled, "');");
-    out(mangled, "=", "window.currentPythonRunner.reportValue(", dataToStore, ", '", mangled, "');");
+    out(mangled, "=", "window.currentPythonRunner.reportValue(", dataToStore, ", '", varName, "');");
 }
 
-function hookGr(v, arguments) {
+function hookGr(v, args) {
     /*
     var args = "";
     for (i = 1; i < arguments.length; ++i) {
@@ -41,8 +41,8 @@ function hookGr(v, arguments) {
     // TO :
 
     out("var ", v, "=");
-    for (i = 1; i < arguments.length; ++i) {
-        out(arguments[i]);
+    for (let i = 1; i < args.length; ++i) {
+        out(args[i]);
     }
     out(";");
     //out("console.log('var '" + v + "'='," + arguments + ")");
@@ -425,7 +425,7 @@ Compiler.prototype._checkSuspension = function(e) {
 
         e = e || {lineno: "$currLineNo", col_offset: "$currColNo"};
 
-        out ("if ($ret && $ret.$isSuspension) { console.log('saveSuspension'); return $saveSuspension($ret,'"+this.filename+"',"+e.lineno+","+e.col_offset+"); }");
+        out ("if ($ret && $ret.$isSuspension) { return $saveSuspension($ret,'"+this.filename+"',"+e.lineno+","+e.col_offset+"); }");
 
         this.u.doesSuspend = true;
         this.u.tempsToSave = this.u.tempsToSave.concat(this.u.localtemps);
@@ -640,7 +640,7 @@ Compiler.prototype.cyield = function(e)
     }
     nextBlock = this.newBlock("after yield");
     // return a pair: resume target block and yielded value
-    out(" console.log('cyield return'); return [/*resume*/", nextBlock, ",/*ret*/", val, "];");
+    out(" return [/*resume*/", nextBlock, ",/*ret*/", val, "];");
     this.setBlock(nextBlock);
     return "$gen.gi$sentvalue"; // will either be null if none sent, or the value from gen.send(value)
 };
@@ -2243,7 +2243,7 @@ Compiler.prototype.clambda = function (e) {
     Sk.asserts.assert(e instanceof Sk.astnodes.Lambda);
     func = this.buildcodeobj(e, new Sk.builtin.str("<lambda>"), null, e.args, function (scopename) {
         var val = this.vexpr(e.body);
-        out("console.log('clambda return'); return ", val, ";");
+        out("return ", val, ";");
     });
     return func;
 };
@@ -2484,7 +2484,7 @@ Compiler.prototype.vstmt = function (s, class_for_super) {
             }
             val = s.value ? this.vexpr(s.value) : "Sk.builtin.none.none$";
             if (this.u.finallyBlocks.length == 0) {
-                out("console.log('astnode return'); return ", val, ";");
+                out("return ", val, ";");
             } else {
                 out("$postfinally={returning:",val,"};");
                 this._jump(this.peekFinallyBlock().blk);
@@ -2871,7 +2871,8 @@ Compiler.prototype.cmod = function (mod) {
     switch (mod.constructor) {
         case Sk.astnodes.Module:
             this.cbody(mod.body);
-            out("console.log('cmod ast return'); return $loc;");
+            // out("console.log('cmod ast return'); return $loc;");
+            out("return $loc;");
             break;
         default:
             Sk.asserts.fail("todo; unhandled case in compilerMod");

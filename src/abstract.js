@@ -812,7 +812,7 @@ Sk.abstr.objectGetItem = function (o, key, canSuspend) {
 Sk.exportSymbol("Sk.abstr.objectGetItem", Sk.abstr.objectGetItem);
 
 Sk.abstr.objectSetItem = function (o, key, v, canSuspend) {
-    console.log('objectSetItem', o, key, v, canSuspend);
+    //console.log("objectSetItem", o, key, v, canSuspend);
 
     var otypename;
     if (o !== null) {
@@ -857,7 +857,7 @@ Sk.exportSymbol("Sk.abstr.gattr", Sk.abstr.gattr);
 
 
 Sk.abstr.sattr = function (obj, pyName, data, canSuspend) {
-    console.log('S_ATTR',obj, pyName, data, canSuspend);
+    //console.log("S_ATTR",obj, pyName, data, canSuspend);
 
     var objname = Sk.abstr.typeName(obj), r, setf;
     var jsName = pyName.$jsstr();
