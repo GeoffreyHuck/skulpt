@@ -669,10 +669,7 @@ Sk.builtin.list.prototype["copy"] = new Sk.builtin.func(function (self) {
 
 Sk.builtin.list.prototype["clone"] = function() {
     let items = [];
-    for (let it = Sk.abstr.iter(this), k = it.tp$iternext();
-        k !== undefined;
-        k = it.tp$iternext()) {
-        //items.push(k.clone());
+    for (let it = Sk.abstr.iter(this), k = it.tp$iternext(); k !== undefined; k = it.tp$iternext()) {
         items.push(k);
     }
 

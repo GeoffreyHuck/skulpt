@@ -538,6 +538,20 @@ Sk.builtin.dict.prototype["copy"] = new Sk.builtin.func(function (self) {
     return newCopy;
 });
 
+Sk.builtin.dict.prototype["clone"] = function() {
+    const newCopy = new Sk.builtin.dict([]);
+    for (let it = Sk.abstr.iter(this), k = it.tp$iternext(); k !== undefined; k = it.tp$iternext()) {
+        let v = this.mp$subscript(k);
+        if (v === undefined) {
+            v = null;
+        }
+
+        newCopy.mp$ass_subscript(k, v);
+    }
+
+    return newCopy;
+};
+
 Sk.builtin.dict.$fromkeys = function fromkeys(self, seq, value) {
     var k, iter, val, res, iterable;
 
