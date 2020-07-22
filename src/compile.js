@@ -18,7 +18,12 @@ function hookAffectation(mangled, dataToStore, debug) {
 
     // TO :   $loc.varName = window.currentPythonRunner.reportValue(value, 'varName');
     var varName = mangled.substr(5);
-    // out(mangled, "=", "window.currentPythonRunner.reportValue(Sk.builtin.persistentCopy(", mangled, ", ", dataToStore, "), '", mangled, "');");
+
+    out("if (" + dataToStore + "._uuid) {");
+    out("$loc.__refs__ = ($loc.hasOwnProperty('__refs__')) ? $loc.__refs__ : [];");
+    out("$loc.__refs__[" + dataToStore + "._uuid ] = '" + varName + "';");
+    out("}");
+
     out(mangled, "=", "window.currentPythonRunner.reportValue(", dataToStore, ", '", varName, "');");
 }
 
@@ -161,6 +166,7 @@ Compiler.prototype.annotateSource = function (ast) {
 
         Sk.asserts.assert(ast.lineno !== undefined && ast.col_offset !== undefined);
         out("$currLineNo = ", lineno, ";\n$currColNo = ", col_offset, ";\n\n");
+        //out("debugger;");
     }
 };
 
@@ -354,6 +360,7 @@ Compiler.prototype._gr = function (hint, rest) {
     hookGr(v, arguments);
 
     if (rest.substr(0, 5) === "$loc.") {
+        //debugger;
         this.localReferencesToUpdateForPersistantVariables.push({
             localName: rest,
             ref: v
@@ -806,10 +813,15 @@ Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
         return this._gr("lsubscr", "$ret");
     }
     else if (ctx === Sk.astnodes.Store || ctx === Sk.astnodes.AugStore) {
-        out(obj, " = ", obj, ".clone();");
+        out(obj, " = ", obj, ".clone(" + data + ");");
 
+        // $ret = Sk.abstr.objectSetItem($LIST, $INDEX, $VALUE, true);
         out("$ret = Sk.abstr.objectSetItem(", obj, ",", subs, ",", data, ", true);");
 
+        out("Sk.builtin.changeReferences($loc, " + obj + ");");
+
+        // TODO: Remove this.localReferencesToUpdateForPersistantVariables
+        /*
         for (let idx in this.localReferencesToUpdateForPersistantVariables) {
             const localName = this.localReferencesToUpdateForPersistantVariables[idx].localName;
             if (this.localReferencesToUpdateForPersistantVariables[idx].hasOwnProperty("ref")) {
@@ -828,6 +840,7 @@ Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
                 out("Sk.abstr.objectSetItem(", localName, ",", index, ",", lastObj, ", true);");
             }
         }
+        */
 
         this._checkSuspension();
     }
@@ -975,13 +988,16 @@ Compiler.prototype.vexpr = function (e, data, augvar, augsubs) {
                     out("$ret = undefined;");
                     out("if(", data, "!==undefined){");
                     out("$ret = Sk.abstr.sattr(", augvar, ",", mname, ",", data, ", true);");
-                    // out("console.log('AugStore ret ',$ret);");
+                    //out("console.log('AugStore ret ',$ret);");
                     out("}");
                     this._checkSuspension(e);
                     break;
                 case Sk.astnodes.Store:
+                    out("console.log(" + val + ");");
+                    out(val, " = ", val, ".clone();");
+                    out("console.log(" + val + ");");
+                    //out("debugger;");
                     out("$ret = Sk.abstr.sattr(", val, ",", mname, ",", data, ", true);");
-                    // out("console.log('Store ret ',$ret);");
                     this._checkSuspension(e);
                     break;
                 case Sk.astnodes.Del:
@@ -2669,6 +2685,17 @@ Compiler.prototype.nameop = function (name, ctx, dataToStore) {
             switch (ctx) {
                 case Sk.astnodes.Load:
                     // can't be || for loc.x = 0 or null
+                    out("console.log('test1', '" + mangled + "', '" + mangledNoPre + "');");
+
+                    if (mangled.substr(0, 5) === "$loc.") {
+                        // Warning : renders things like $loc.a = a which we don't want.
+                        /*this.localReferencesToUpdateForPersistantVariables.push({
+                            localName: mangled,
+                            ref: mangledNoPre
+                        });*/
+
+                        console.log('lcoalReffff  ', this.localReferencesToUpdateForPersistantVariables);
+                    }
 
                     return this._gr("loadname", mangled, "!==undefined?", mangled, ":Sk.misceval.loadname('", mangledNoPre, "',$gbl);");
                 case Sk.astnodes.Store:
@@ -2687,6 +2714,7 @@ Compiler.prototype.nameop = function (name, ctx, dataToStore) {
         case OP_GLOBAL:
             switch (ctx) {
                 case Sk.astnodes.Load:
+                    out("console.log('test2', '" + mangledNoPre + "');");
                     return this._gr("loadgbl", "Sk.misceval.loadname('", mangledNoPre, "',$gbl)");
                 case Sk.astnodes.Store:
                     // out("$gbl.", mangledNoPre, "=", dataToStore, ";");

@@ -1,3 +1,5 @@
+import { v4 as uuidv4 } from 'uuid';
+
 /**
  * @constructor
  * @param {Array.<Object>=} L
@@ -44,8 +46,19 @@ Sk.builtin.list = function (L, canSuspend) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(L)+ "' " +"object is not iterable");
     }
 
-    this["uuid"] = parseInt(Math.random() * 1000000000);
-    this["v"] = this.v = v;
+    this._uuid = uuidv4();
+    this._parents = [];
+
+    for (let idx in v) {
+        const element = v[idx];
+
+        if (element instanceof Sk.builtin.list) {
+            element._parents[this._uuid] = this;
+        }
+    }
+
+    this.v = v;
+
     return this;
 };
 
@@ -667,13 +680,31 @@ Sk.builtin.list.prototype["copy"] = new Sk.builtin.func(function (self) {
 
 });
 
-Sk.builtin.list.prototype["clone"] = function() {
+Sk.builtin.list.prototype["clone"] = function(newElementValue) {
     let items = [];
     for (let it = Sk.abstr.iter(this), k = it.tp$iternext(); k !== undefined; k = it.tp$iternext()) {
-        items.push(k);
+        if (newElementValue.hasOwnProperty('_uuid') && k.hasOwnProperty('_uuid') && newElementValue._uuid === k._uuid) {
+            items.push(newElementValue);
+        } else {
+            items.push(k);
+        }
     }
 
-    return new Sk.builtin.list(items);
+    const clone = new Sk.builtin.list(items);
+    clone._uuid = this._uuid;
+    clone._parents = this._parents;
+
+    for (let it = Sk.abstr.iter(clone), k = it.tp$iternext(); k !== undefined; k = it.tp$iternext()) {
+        if (k.hasOwnProperty('_parents')) {
+            k._parents[clone._uuid] = clone;
+        }
+    }
+
+    if (newElementValue && newElementValue.hasOwnProperty('_parents')) {
+        newElementValue._parents[clone._uuid] = clone;
+    }
+
+    return clone;
 };
 
 Sk.builtin.list.prototype["reverse"] = new Sk.builtin.func(Sk.builtin.list.prototype.list_reverse_);

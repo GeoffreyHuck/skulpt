@@ -203,6 +203,26 @@ Sk.builtin.object.prototype.ob$type = Sk.builtin.type.makeIntoTypeObj("object", 
 Sk.builtin.object.prototype.ob$type.sk$klass = undefined;   // Nonsense for closure compiler
 Sk.builtin.object.prototype.tp$descr_set = undefined;   // Nonsense for closure compiler
 
+Sk.builtin.object.prototype["clone"] = function() {
+    /**
+     * Warning : Only clone the content, not the reference itself.
+     * Then only the internal dict will be persistent and not the object itself.
+     *
+     * Possible workaround : Find a way to copy an object. But copying only the
+     * attributes doesn't work, so it would require something else.
+     */
+    //const newObject = this;
+
+    // Try to overcome to above warning.
+    const newObject = Object.create(this);
+
+    if (this.hasOwnProperty("$d")) {
+        newObject["$d"] = this["$d"].clone();
+    }
+    //debugger;
+    return newObject;
+};
+
 /** Default implementations of dunder methods found in all Python objects */
 /**
  * Default implementation of __new__ just calls the class constructor

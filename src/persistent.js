@@ -60,4 +60,47 @@ Sk.builtin.removeOldValues = function(value) {
     }
 };
 
+/**
+ * Changes recursively all the references of an object.
+ *
+ * @param $loc   The internal skulpt loc.
+ * @param parent The object's parent.
+ * @param obj    The object.
+ */
+Sk.builtin.changeReferencesRec = function ($loc, parent, obj) {
+    const parentClone = parent.clone(obj);
+
+    if ($loc.__refs__[parentClone._uuid]) {
+        $loc[$loc.__refs__[parentClone._uuid]] = parentClone;
+    }
+
+    if (parentClone._parents) {
+        for (let parentUuid in parentClone._parents) {
+            Sk.builtin.changeReferencesRec($loc, parentClone._parents[parentUuid], parentClone);
+        }
+    }
+};
+
+/**
+ * Changes all the references of an object.
+ *
+ * @param $loc The internal skulpt loc.
+ * @param obj  The object.
+ */
+Sk.builtin.changeReferences = function ($loc, obj) {
+    if ($loc.hasOwnProperty("__refs__")) {
+        if ($loc.__refs__[obj._uuid]) {
+            // obj is already a clone.
+            $loc[$loc.__refs__[obj._uuid]] = obj;
+        }
+
+        if (obj._parents) {
+            for (let parentUuid in obj._parents) {
+                Sk.builtin.changeReferencesRec($loc, obj._parents[parentUuid], obj);
+            }
+        }
+    }
+};
+
 Sk.exportSymbol("Sk.builtin.persistentCopy", Sk.builtin.persistentCopy);
+Sk.exportSymbol("Sk.builtin.changeReferences", Sk.builtin.changeReferences);
