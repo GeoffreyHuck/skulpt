@@ -819,6 +819,22 @@ Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
         out("$ret = Sk.abstr.objectSetItem(", obj, ",", subs, ",", data, ", true);");
 
         out("Sk.builtin.changeReferences($loc, " + obj + ");");
+        out("var $__correspondences__ = Sk.builtin.changeReferences($gbl, " + obj + ");");
+
+        /**
+         * Update the function's parameters variables if required.
+         *
+         * Skulpt access those variables directly by their name.
+         * eg: test(a) has a "var a" in the local scope.
+         */
+        if (this.u.ste.varnames.length) {
+            for (let idx in this.u.ste.varnames) {
+                const varname = this.u.ste.varnames[idx];
+                out("if (" + varname + " && " + varname + ".hasOwnProperty('_uuid') && $__correspondences__.hasOwnProperty(" + varname + "._uuid)) {");
+                out("  " + varname + " = $__correspondences__[" + varname + "._uuid];");
+                out("}");
+            }
+        }
 
         // TODO: Remove this.localReferencesToUpdateForPersistantVariables
         /*
