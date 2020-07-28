@@ -4,9 +4,10 @@ import { v4 as uuidv4 } from 'uuid';
  * @constructor
  * @param {Array.<Object>=} L
  * @param {boolean=} canSuspend (defaults to true in this case, as list() is used directly from Python)
+ * @param uuid The uuid, if not set it will be created.
  * @extends Sk.builtin.object
  */
-Sk.builtin.list = function (L, canSuspend) {
+Sk.builtin.list = function (L, canSuspend, uuid) {
     var v, it, thisList;
 
     if (this instanceof Sk.builtin.list) {
@@ -46,15 +47,28 @@ Sk.builtin.list = function (L, canSuspend) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(L)+ "' " +"object is not iterable");
     }
 
-    this._uuid = uuidv4();
-    this._parents = [];
+    // Sets the UUID.
+    console.log('list', v, canSuspend, uuid);
+    if (uuid === undefined) {
+        this._uuid = uuidv4();
 
-    for (let idx in v) {
-        const element = v[idx];
+        /*
+         * Set the parents.
+         *
+         * If uuid is provided, then it is a clone and the parents are
+         * copied during the clone.
+         */
 
-        if (element instanceof Sk.builtin.list) {
-            element._parents[this._uuid] = this;
+        this._parents = [];
+        for (let idx in v) {
+            const element = v[idx];
+
+            if (element instanceof Sk.builtin.list) {
+                element._parents[this._uuid] = this;
+            }
         }
+    } else {
+        this._uuid = uuid;
     }
 
     this.v = v;
@@ -689,9 +703,8 @@ Sk.builtin.list.prototype["clone"] = function(newElementValue) {
             items.push(k);
         }
     }
-
-    const clone = new Sk.builtin.list(items);
-    clone._uuid = this._uuid;
+console.log("clone", this);
+    const clone = new Sk.builtin.list(items, true, this._uuid);
     clone._parents = this._parents;
 
     for (let it = Sk.abstr.iter(clone), k = it.tp$iternext(); k !== undefined; k = it.tp$iternext()) {
