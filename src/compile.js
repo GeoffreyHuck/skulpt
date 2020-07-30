@@ -816,7 +816,17 @@ Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
         return this._gr("lsubscr", "$ret");
     }
     else if (ctx === Sk.astnodes.Store || ctx === Sk.astnodes.AugStore) {
-        out(obj, " = ", obj, ".clone(" + data + ");");
+        //out("debugger;");
+        // If we put the list within itself, we need both references to be the same.
+        // out("if (" + data + ".hasOwnProperty('_uuid') && " + obj + "._uuid === " + data + "._uuid) {");
+        // out("  " + obj, " = ", obj, ".clone(" + obj + ");");
+        // out("  " + data + " = " + obj + ";");
+        // out("} else {");
+        out("  " + obj, " = ", obj, ".clone(" + data + ");");
+        // out("}");
+
+        out("var $__cloned_references = {};");
+        out("$__cloned_references[" + obj + "._uuid] = " + obj + ";");
 
         /**
          * Changes all the references of the object in :
@@ -829,9 +839,6 @@ Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
         // $ret = Sk.abstr.objectSetItem($LIST, $INDEX, $VALUE, true);
         out("$ret = Sk.abstr.objectSetItem(", obj, ",", subs, ",", data, ", true);");
 
-        out("var $__cloned_references = {};");
-        out("$__cloned_references[" + obj + "._uuid] = " + obj + ";");
-
         out("Sk.builtin.changeReferences($__cloned_references, $loc, " + obj + ");");
         out("for (var idx in window.currentPythonRunner._debugger.suspension_stack) {");
         out("  if (idx > 0) {");
@@ -842,7 +849,12 @@ Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
         out("  }");
         out("}");
         out("var $__correspondences__ = Sk.builtin.changeReferences($__cloned_references, $gbl, " + obj + ");");
-        //out("debugger;");
+
+        /**
+         * If some elements within the list have been cloned during the changes of references process,
+         * then we need to put those cloned elements in the list.
+         */
+        out(obj + ".updateReferencesInside($__cloned_references);");
 
         /**
          * Update the function's parameters variables if required.

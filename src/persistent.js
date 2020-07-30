@@ -38,10 +38,19 @@ Sk.builtin.changeReferencesRec = function (clonedReferences, $loc, parent, obj) 
     if (parentClone._parents) {
         console.log('number of parents', parentClone._parents.length);
         for (let parentUuid in parentClone._parents) {
-            const correspondencesRec = Sk.builtin.changeReferencesRec(clonedReferences, $loc, parentClone._parents[parentUuid], parentClone);
+            const parentParent = parentClone._parents[parentUuid];
 
-            for (let correspondenceRecIdx in correspondencesRec) {
-                correspondences[correspondenceRecIdx] = correspondencesRec[correspondenceRecIdx];
+
+            if (clonedReferences.hasOwnProperty(parentParent._uuid) && parentParent === clonedReferences[parentParent._uuid]) {
+                /*
+                 * Avoid the cycles : if the reference has already changed, don't go there again.
+                 */
+            } else {
+                const correspondencesRec = Sk.builtin.changeReferencesRec(clonedReferences, $loc, parentParent, parentClone);
+
+                for (let correspondenceRecIdx in correspondencesRec) {
+                    correspondences[correspondenceRecIdx] = correspondencesRec[correspondenceRecIdx];
+                }
             }
         }
     }

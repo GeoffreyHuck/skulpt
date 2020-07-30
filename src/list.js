@@ -49,6 +49,7 @@ Sk.builtin.list = function (L, canSuspend, uuid) {
 
     // Sets the UUID.
     console.log('list', v, canSuspend, uuid);
+    this._ref_uuid = uuidv4();
     if (uuid === undefined) {
         this._uuid = uuidv4();
 
@@ -694,17 +695,53 @@ Sk.builtin.list.prototype["copy"] = new Sk.builtin.func(function (self) {
 
 });
 
+/**
+ * Updates references within a list.
+ *
+ * @param newReferences The set of new references {UUID: Object}.
+ */
+Sk.builtin.list.prototype["updateReferencesInside"] = function(newReferences) {
+    const toChange = {};
+
+    for (let it = Sk.abstr.iter(this), k = it.tp$iternext(); k !== undefined; k = it.tp$iternext()) {
+        if (k.hasOwnProperty('_uuid') && newReferences.hasOwnProperty(k._uuid)) {
+            toChange[it.$index - 1] = newReferences[k._uuid];
+        }
+    }
+
+    for (let idx in toChange) {
+        Sk.abstr.objectSetItem(this, parseInt(idx), toChange[idx], true);
+    }
+};
+
+/**
+ * Clones a list. Used when an element is put or updated.
+ * TODO: And when it is DELETED ? Did you forget this case ?
+ *
+ * @param newElementValue The new element put or updated.
+ */
 Sk.builtin.list.prototype["clone"] = function(newElementValue) {
+    const thisInKeys = [];
     let items = [];
     for (let it = Sk.abstr.iter(this), k = it.tp$iternext(); k !== undefined; k = it.tp$iternext()) {
         if (newElementValue.hasOwnProperty('_uuid') && k.hasOwnProperty('_uuid') && newElementValue._uuid === k._uuid) {
             items.push(newElementValue);
+        } else if (k.hasOwnProperty('_uuid') && k._uuid === this._uuid) {
+            thisInKeys.push(it.$index - 1);
+
+            items.push(this);
         } else {
             items.push(k);
         }
     }
-console.log("clone", this);
+
     const clone = new Sk.builtin.list(items, true, this._uuid);
+
+    // If the list contains itself, update those references.
+    for (let idx in thisInKeys) {
+        Sk.abstr.objectSetItem(clone, thisInKeys[idx], clone, true);
+    }
+
     clone._parents = this._parents;
 
     for (let it = Sk.abstr.iter(clone), k = it.tp$iternext(); k !== undefined; k = it.tp$iternext()) {
