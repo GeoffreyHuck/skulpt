@@ -81,10 +81,6 @@ function Compiler (filename, st, flags, canSuspend, sourceCodeForAnnotation) {
 
     this.allUnits = [];
 
-    this.localReferencesToUpdateForPersistantVariables = [];
-    //this.localReferencesModified = false;
-    // this.localReferencesToUpdateWihoutOldValueVariables = [];
-
     this.source = sourceCodeForAnnotation ? sourceCodeForAnnotation.split("\n") : false;
 }
 
@@ -361,14 +357,6 @@ Compiler.prototype._gr = function (hint, rest) {
     this.u.localtemps.push(v);
 
     hookGr(v, arguments);
-
-    if (rest.substr(0, 5) === "$loc.") {
-        //debugger;
-        this.localReferencesToUpdateForPersistantVariables.push({
-            localName: rest,
-            ref: v
-        });
-    }
 
     return v;
 };
@@ -806,24 +794,13 @@ Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
     }
 
     if (ctx === Sk.astnodes.Load || ctx === Sk.astnodes.AugLoad) {
-        this.localReferencesToUpdateForPersistantVariables.unshift({
-            localName: obj,
-            index: subs
-        });
-
         out("$ret = Sk.abstr.objectGetItem(", obj, ",", subs, ", true);");
         this._checkSuspension();
         return this._gr("lsubscr", "$ret");
     }
     else if (ctx === Sk.astnodes.Store || ctx === Sk.astnodes.AugStore) {
-        //out("debugger;");
-        // If we put the list within itself, we need both references to be the same.
-        // out("if (" + data + ".hasOwnProperty('_uuid') && " + obj + "._uuid === " + data + "._uuid) {");
-        // out("  " + obj, " = ", obj, ".clone(" + obj + ");");
-        // out("  " + data + " = " + obj + ";");
-        // out("} else {");
+        // out("debugger;");
         out("  " + obj, " = ", obj, ".clone(" + data + ");");
-        // out("}");
 
         out("var $__cloned_references = {};");
         out("$__cloned_references[" + obj + "._uuid] = " + obj + ";");
@@ -867,33 +844,11 @@ Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
 
             for (let idx in localnames) {
                 const varname = localnames[idx];
-                out("if (" + varname + " && " + varname + ".hasOwnProperty('_uuid') && $__correspondences__.hasOwnProperty(" + varname + "._uuid)) {");
-                out("  " + varname + " = $__correspondences__[" + varname + "._uuid];");
+                out("if (" + varname + " && " + varname + ".hasOwnProperty('_uuid') && $__cloned_references.hasOwnProperty(" + varname + "._uuid)) {");
+                out("  " + varname + " = $__cloned_references[" + varname + "._uuid];");
                 out("}");
             }
         }
-
-        // TODO: Remove this.localReferencesToUpdateForPersistantVariables
-        /*
-        for (let idx in this.localReferencesToUpdateForPersistantVariables) {
-            const localName = this.localReferencesToUpdateForPersistantVariables[idx].localName;
-            if (this.localReferencesToUpdateForPersistantVariables[idx].hasOwnProperty("ref")) {
-                const ref = this.localReferencesToUpdateForPersistantVariables[idx].ref;
-
-                out(localName, " = " + ref + ";");
-            } else {
-                const index = this.localReferencesToUpdateForPersistantVariables[idx].index;
-
-                out(localName, " = ", localName, ".clone();");
-
-                var lastObj = obj;
-                if (idx > 0) {
-                    lastObj = this.localReferencesToUpdateForPersistantVariables[idx - 1].localName;
-                }
-                out("Sk.abstr.objectSetItem(", localName, ",", index, ",", lastObj, ", true);");
-            }
-        }
-        */
 
         this._checkSuspension();
     }
@@ -2527,9 +2482,6 @@ Compiler.prototype.cbreak = function (s) {
  * @param {Sk.builtin.str=} class_for_super
  */
 Compiler.prototype.vstmt = function (s, class_for_super) {
-    //this.localReferencesModified = false;
-    this.localReferencesToUpdateForPersistantVariables = [];
-
     var i;
     var val;
     var n;
@@ -2752,17 +2704,6 @@ Compiler.prototype.nameop = function (name, ctx, dataToStore) {
             switch (ctx) {
                 case Sk.astnodes.Load:
                     // can't be || for loc.x = 0 or null
-                    out("console.log('test1', '" + mangled + "', '" + mangledNoPre + "');");
-
-                    if (mangled.substr(0, 5) === "$loc.") {
-                        // Warning : renders things like $loc.a = a which we don't want.
-                        /*this.localReferencesToUpdateForPersistantVariables.push({
-                            localName: mangled,
-                            ref: mangledNoPre
-                        });*/
-
-                        console.log('lcoalReffff  ', this.localReferencesToUpdateForPersistantVariables);
-                    }
 
                     return this._gr("loadname", mangled, "!==undefined?", mangled, ":Sk.misceval.loadname('", mangledNoPre, "',$gbl);");
                 case Sk.astnodes.Store:
