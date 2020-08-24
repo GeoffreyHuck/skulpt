@@ -799,7 +799,7 @@ Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
         return this._gr("lsubscr", "$ret");
     }
     else if (ctx === Sk.astnodes.Store || ctx === Sk.astnodes.AugStore) {
-        // out("debugger;");
+        //out("debugger;");
         out("  " + obj, " = ", obj, ".clone(" + data + ");");
 
         out("var $__cloned_references = {};");
@@ -825,7 +825,7 @@ Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
         out("    Sk.builtin.changeReferences($__cloned_references, $__cur_suspension__.$gbl, " + obj + ");");
         out("  }");
         out("}");
-        out("var $__correspondences__ = Sk.builtin.changeReferences($__cloned_references, $gbl, " + obj + ");");
+        out("Sk.builtin.changeReferences($__cloned_references, $gbl, " + obj + ");");
 
         /**
          * If some elements within the list have been cloned during the changes of references process,

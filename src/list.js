@@ -48,7 +48,6 @@ Sk.builtin.list = function (L, canSuspend, uuid) {
     }
 
     // Sets the UUID.
-    console.log('list', v, canSuspend, uuid);
     this._ref_uuid = uuidv4();
     if (uuid === undefined) {
         this._uuid = uuidv4();
@@ -64,7 +63,7 @@ Sk.builtin.list = function (L, canSuspend, uuid) {
         for (let idx in v) {
             const element = v[idx];
 
-            if (element instanceof Sk.builtin.list) {
+            if (element.hasOwnProperty('_uuid')) {
                 element._parents[this._uuid] = this;
             }
         }
@@ -716,7 +715,6 @@ Sk.builtin.list.prototype["updateReferencesInside"] = function(newReferences) {
 
 /**
  * Clones a list. Used when an element is put or updated.
- * TODO: And when it is DELETED ? Did you forget this case ?
  *
  * @param newElementValue The new element put or updated.
  */

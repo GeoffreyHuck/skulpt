@@ -1,8 +1,11 @@
+import { v4 as uuidv4 } from 'uuid';
+
 /**
  * @constructor
  * @param {Array.<Object>} L
+ * @param uuid The uuid, if not set it will be created.
  */
-Sk.builtin.dict = function dict (L) {
+Sk.builtin.dict = function dict (L, uuid) {
     var v;
     var it, k;
     var i;
@@ -50,6 +53,30 @@ Sk.builtin.dict = function dict (L) {
 
     this.__class__ = Sk.builtin.dict;
     this.tp$call = undefined; // Not callable, even though constructor is
+
+    // Sets the UUID.
+    this._ref_uuid = uuidv4();
+    if (uuid === undefined) {
+        this._uuid = uuidv4();
+
+        /*
+         * Set the parents.
+         *
+         * If uuid is provided, then it is a clone and the parents are
+         * copied during the clone.
+         */
+
+        this._parents = [];
+        for (let idx in this.buckets) {
+            const element = this.buckets[idx].items[0].rhs;
+
+            if (element.hasOwnProperty('_uuid')) {
+                element._parents[this._uuid] = this;
+            }
+        }
+    } else {
+        this._uuid = uuid;
+    }
 
     return this;
 };
@@ -538,18 +565,81 @@ Sk.builtin.dict.prototype["copy"] = new Sk.builtin.func(function (self) {
     return newCopy;
 });
 
-Sk.builtin.dict.prototype["clone"] = function() {
-    const newCopy = new Sk.builtin.dict([]);
+/**
+ * Clones a dict. Used when an element is put or updated.
+ *
+ * @param newElementValue The new element put or updated.
+ */
+Sk.builtin.dict.prototype["clone"] = function(newElementValue) {
+    const clone = new Sk.builtin.dict([], this._uuid);
+    const thisInKeys = [];
     for (let it = Sk.abstr.iter(this), k = it.tp$iternext(); k !== undefined; k = it.tp$iternext()) {
         let v = this.mp$subscript(k);
         if (v === undefined) {
             v = null;
         }
 
-        newCopy.mp$ass_subscript(k, v);
+        if (v && newElementValue.hasOwnProperty('_uuid') && v.hasOwnProperty('_uuid') && newElementValue._uuid === v._uuid) {
+            clone.mp$ass_subscript(k, newElementValue);
+        } else if (v && v.hasOwnProperty('_uuid') && v._uuid === this._uuid) {
+            thisInKeys.push(k);
+
+            clone.mp$ass_subscript(k, this);
+        } else {
+            clone.mp$ass_subscript(k, v);
+        }
     }
 
-    return newCopy;
+    // If the list contains itself, update those references.
+    for (let idx in thisInKeys) {
+        clone.mp$ass_subscript(thisInKeys[idx], this);
+    }
+
+    clone._parents = this._parents;
+
+    for (let it = Sk.abstr.iter(this), k = it.tp$iternext(); k !== undefined; k = it.tp$iternext()) {
+        let v = this.mp$subscript(k);
+        if (v === undefined) {
+            v = null;
+        }
+
+        if (v && v.hasOwnProperty('_parents')) {
+            v._parents[clone._uuid] = clone;
+        }
+    }
+
+    if (newElementValue && newElementValue.hasOwnProperty('_parents')) {
+        newElementValue._parents[clone._uuid] = clone;
+    }
+
+    return clone;
+};
+
+/**
+ * Updates references within a list.
+ *
+ * @param newReferences The set of new references {UUID: Object}.
+ */
+Sk.builtin.dict.prototype["updateReferencesInside"] = function(newReferences) {
+    const toChange = [];
+
+    for (let it = Sk.abstr.iter(this), k = it.tp$iternext(); k !== undefined; k = it.tp$iternext()) {
+        let v = this.mp$subscript(k);
+        if (v === undefined) {
+            v = null;
+        }
+
+        if (v && v.hasOwnProperty('_uuid') && newReferences.hasOwnProperty(v._uuid)) {
+            toChange.push({
+                key: k,
+                value: newReferences[v._uuid]
+            });
+        }
+    }
+
+    for (let idx in toChange) {
+        this.mp$ass_subscript(toChange[idx].key, toChange[idx].value);
+    }
 };
 
 Sk.builtin.dict.$fromkeys = function fromkeys(self, seq, value) {
