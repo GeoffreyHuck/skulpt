@@ -83,6 +83,7 @@ Sk.doOneTimeInitialization = function (canSuspend) {
             child.tp$base = bases[0];
         }
         child["$d"] = new Sk.builtin.dict([]);
+        console.log("Sk.doOneTimeInitialization: reference ?");
         child["$d"].mp$ass_subscript(Sk.builtin.type.basesStr_, new Sk.builtin.tuple(bases));
         child["$d"].mp$ass_subscript(Sk.builtin.type.mroStr_, child.tp$mro);
     };

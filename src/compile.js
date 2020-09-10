@@ -18,7 +18,6 @@ function hookAffectation(mangled, dataToStore, debug) {
 
     // TO :   $loc.varName = window.currentPythonRunner.reportValue(value, 'varName');
     var varName = mangled.substr(5);
-
     out("if (" + dataToStore + "._uuid) {");
     out("  $loc.__refs__ = ($loc.hasOwnProperty('__refs__')) ? $loc.__refs__ : [];");
     out("  if (!$loc.__refs__.hasOwnProperty(" + dataToStore + "._uuid)) {");
@@ -165,7 +164,6 @@ Compiler.prototype.annotateSource = function (ast) {
 
         Sk.asserts.assert(ast.lineno !== undefined && ast.col_offset !== undefined);
         out("$currLineNo = ", lineno, ";\n$currColNo = ", col_offset, ";\n\n");
-        //out("debugger;");
     }
 };
 
@@ -720,11 +718,13 @@ Compiler.prototype.ccall = function (e) {
         out("$ret = Sk.misceval.applyOrSuspend(",func,",undefined,undefined,",keywordArgs,",",positionalArgs,");");
     } else if (positionalArgs != "[]") {
         // out("console.log('ENTER callsimOrSuspendArray','" + func + "'," + func + "," + positionalArgs + ");");
-        out ("$ret = Sk.misceval.callsimOrSuspendArray(", func, ", ", positionalArgs, ");");
+        out("$ret = Sk.misceval.callsimOrSuspendArray(", func, ", ", positionalArgs, ");");
     } else {
         // out("console.log('ENTEER callsimOrSuspendArray','" + func + "'," + func + ");");
-        out ("$ret = Sk.misceval.callsimOrSuspendArray(", func, ");");
+        out("$ret = Sk.misceval.callsimOrSuspendArray(", func, ");");
     }
+
+    out("Sk.builtin.registerPromiseReference($ret);");
 
     this._checkSuspension(e);
 
@@ -789,66 +789,18 @@ Compiler.prototype.vslice = function (s, ctx, obj, dataToStore) {
 };
 
 Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
-    if (this.filename === "<stdin>.py") {
-        //debugger;
-    }
-
     if (ctx === Sk.astnodes.Load || ctx === Sk.astnodes.AugLoad) {
         out("$ret = Sk.abstr.objectGetItem(", obj, ",", subs, ", true);");
         this._checkSuspension();
         return this._gr("lsubscr", "$ret");
     }
     else if (ctx === Sk.astnodes.Store || ctx === Sk.astnodes.AugStore) {
-        //out("debugger;");
-        out("  " + obj, " = ", obj, ".clone(" + data + ");");
-
-        out("var $__cloned_references = {};");
-        out("$__cloned_references[" + obj + "._uuid] = " + obj + ";");
-
-        /**
-         * Changes all the references of the object in :
-         *   - local variables
-         *   - global variables
-         *   - functions parameters
-         *   - other stack frames (suspensions)
-         */
+        this.generateNewReference(obj, data);
 
         // $ret = Sk.abstr.objectSetItem($LIST, $INDEX, $VALUE, true);
         out("$ret = Sk.abstr.objectSetItem(", obj, ",", subs, ",", data, ", true);");
 
-        out("Sk.builtin.changeReferences($__cloned_references, $loc, " + obj + ");");
-        out("for (var idx in window.currentPythonRunner._debugger.suspension_stack) {");
-        out("  if (idx > 0) {");
-        out("    var $__cur_suspension__ = window.currentPythonRunner._debugger.suspension_stack[idx];");
-        out("    Sk.builtin.changeReferences($__cloned_references, $__cur_suspension__.$tmps, " + obj + ");");
-        out("    Sk.builtin.changeReferences($__cloned_references, $__cur_suspension__.$loc, " + obj + ");");
-        out("    Sk.builtin.changeReferences($__cloned_references, $__cur_suspension__.$gbl, " + obj + ");");
-        out("  }");
-        out("}");
-        out("Sk.builtin.changeReferences($__cloned_references, $gbl, " + obj + ");");
-
-        /**
-         * If some elements within the list have been cloned during the changes of references process,
-         * then we need to put those cloned elements in the list.
-         */
-        out(obj + ".updateReferencesInside($__cloned_references);");
-
-        /**
-         * Update the function's parameters variables if required.
-         *
-         * Skulpt access those variables directly by their name.
-         * eg: test(a) has a "var a" in the local scope.
-         */
-        if (this.u.localnames.length) {
-            const localnames = [...new Set(this.u.localnames)];
-
-            for (let idx in localnames) {
-                const varname = localnames[idx];
-                out("if (" + varname + " && " + varname + ".hasOwnProperty('_uuid') && $__cloned_references.hasOwnProperty(" + varname + "._uuid)) {");
-                out("  " + varname + " = $__cloned_references[" + varname + "._uuid];");
-                out("}");
-            }
-        }
+        this.updateReferences(obj);
 
         this._checkSuspension();
     }
@@ -857,6 +809,81 @@ Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
     }
     else {
         Sk.asserts.fail("handlesubscr fail");
+    }
+};
+
+/**
+ * Generates a new reference for an object.
+ *
+ * @param objVariableName The object's variable name.
+ * @param data            The object's data.
+ */
+Compiler.prototype.generateNewReference = function(objVariableName, data) {
+    out("  " + objVariableName, " = ", objVariableName, ".clone(" + data + ");");
+
+    out("var $__cloned_references = {};");
+    out("$__cloned_references[" + objVariableName + "._uuid] = " + objVariableName + ";");
+
+    out("if (" + objVariableName + ".hasOwnProperty('$d')) {");
+    out("  $__cloned_references[" + objVariableName + ".$d._uuid] = " + objVariableName + ".$d;");
+    out("}");
+};
+
+/**
+ * Updates all references of an object.
+ *
+ * @param obj The object.
+ */
+Compiler.prototype.updateReferences = function(obj) {
+    /**
+     * Changes all the references of the object in :
+     *   - Local variables
+     *   - Global variables
+     *   - Functions parameters
+     *   - The promises references in the debugger
+     *   - The object itself
+     *   - Other stack frames (suspensions)
+     */
+
+    out("Sk.builtin.changeReferences($__cloned_references, $loc, " + obj + ");");
+    out("for (var idx in window.currentPythonRunner._debugger.suspension_stack) {");
+    out("  if (idx > 0) {");
+    out("    var $__cur_suspension__ = window.currentPythonRunner._debugger.suspension_stack[idx];");
+    out("    while ($__cur_suspension__) {");
+    out("      if ($__cur_suspension__.hasOwnProperty('$gbl')) {");
+    out("        Sk.builtin.changeReferences($__cloned_references, $__cur_suspension__.$tmps, " + obj + ");");
+    out("        Sk.builtin.changeReferences($__cloned_references, $__cur_suspension__.$loc, " + obj + ");");
+    out("        Sk.builtin.changeReferences($__cloned_references, $__cur_suspension__.$gbl, " + obj + ");");
+    out("      }");
+    out("      $__cur_suspension__ = $__cur_suspension__.child;");
+    out("    }");
+    out("  }");
+    out("}");
+    out("Sk.builtin.changeReferences($__cloned_references, $gbl, " + obj + ");");
+
+    out("window.currentPythonRunner._debugger.updatePromiseReference(" + obj + ");");
+
+    /**
+     * If some elements within the list have been cloned during the changes of references process,
+     * then we need to put those cloned elements in the list.
+     */
+    out(obj + ".updateReferencesInside($__cloned_references);");
+
+    /**
+     * Update the function's parameters variables if required.
+     *
+     * Skulpt access those variables directly by their name.
+     * eg: test(a) has a "var a" in the local scope.
+     */
+    if (this.u.localnames.length) {
+        const localnames = [...new Set(this.u.localnames)];
+
+        for (let idx in localnames) {
+            const varname = localnames[idx];
+            out("if (" + varname + " && " + varname + ".hasOwnProperty('_uuid') && $__cloned_references.hasOwnProperty(" + varname + "._uuid)) {");
+            out("  " + varname + " = $__cloned_references[" + varname + "._uuid];");
+            out("}");
+        }
     }
 };
 
@@ -1002,10 +1029,15 @@ Compiler.prototype.vexpr = function (e, data, augvar, augsubs) {
                     break;
                 case Sk.astnodes.Store:
                     out("console.log(" + val + ");");
-                    out(val, " = ", val, ".clone();");
-                    out("console.log(" + val + ");");
-                    //out("debugger;");
+
+                    this.generateNewReference(val, data);
+
                     out("$ret = Sk.abstr.sattr(", val, ",", mname, ",", data, ", true);");
+                    out("debugger;");
+                    out("Sk.builtin.registerParentReferenceInChild(" + val + ", " + data + ");");
+
+                    this.updateReferences(val);
+
                     this._checkSuspension(e);
                     break;
                 case Sk.astnodes.Del:
@@ -1033,11 +1065,7 @@ Compiler.prototype.vexpr = function (e, data, augvar, augsubs) {
 
                     out("$ret=undefined;");
                     out("if(", data, "!==undefined){");
-                    if (this.filename === "<stdin>.py") {
-                        //this.localReferencesModified = true;
-                        //debugger;
-                    }
-                    out("$ret=Sk.abstr.objectSetItem(",augvar,",",augsubs,",",data,", true)");
+                    out("  $ret=Sk.abstr.objectSetItem(",augvar,",",augsubs,",",data,", true)");
                     out("}");
                     this._checkSuspension(e);
                     break;
@@ -2948,11 +2976,7 @@ Sk.compile = function (source, filename, mode, canSuspend) {
     // Restore the global __future__ flags
     Sk.__future__ = savedFlags;
 
-    var ret = "";
-    if (this.filename !== "<stdin>.py") {
-        //ret = "debugger;";
-    }
-    ret += "$compiledmod = function() {" + c.result.join("") + "\nreturn " + funcname + ";}();";
+    var ret = "$compiledmod = function() {" + c.result.join("") + "\nreturn " + funcname + ";}();";
 
     return {
         funcname: "$compiledmod",

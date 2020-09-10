@@ -66,13 +66,11 @@ Sk.builtin.dict = function dict (L, uuid) {
          * copied during the clone.
          */
 
-        this._parents = [];
+        this._parents = {};
         for (let idx in this.buckets) {
             const element = this.buckets[idx].items[0].rhs;
 
-            if (element.hasOwnProperty('_uuid')) {
-                element._parents[this._uuid] = this;
-            }
+            Sk.builtin.registerParentReferenceInChild(this, element);
         }
     } else {
         this._uuid = uuid;
@@ -579,7 +577,7 @@ Sk.builtin.dict.prototype["clone"] = function(newElementValue) {
             v = null;
         }
 
-        if (v && newElementValue.hasOwnProperty('_uuid') && v.hasOwnProperty('_uuid') && newElementValue._uuid === v._uuid) {
+        if (v && newElementValue && newElementValue.hasOwnProperty('_uuid') && v.hasOwnProperty('_uuid') && newElementValue._uuid === v._uuid) {
             clone.mp$ass_subscript(k, newElementValue);
         } else if (v && v.hasOwnProperty('_uuid') && v._uuid === this._uuid) {
             thisInKeys.push(k);
@@ -592,7 +590,7 @@ Sk.builtin.dict.prototype["clone"] = function(newElementValue) {
 
     // If the list contains itself, update those references.
     for (let idx in thisInKeys) {
-        clone.mp$ass_subscript(thisInKeys[idx], this);
+        clone.mp$ass_subscript(thisInKeys[idx], clone);
     }
 
     clone._parents = this._parents;
@@ -603,20 +601,16 @@ Sk.builtin.dict.prototype["clone"] = function(newElementValue) {
             v = null;
         }
 
-        if (v && v.hasOwnProperty('_parents')) {
-            v._parents[clone._uuid] = clone;
-        }
+        Sk.builtin.registerParentReferenceInChild(clone, v);
     }
 
-    if (newElementValue && newElementValue.hasOwnProperty('_parents')) {
-        newElementValue._parents[clone._uuid] = clone;
-    }
+    Sk.builtin.registerParentReferenceInChild(clone, newElementValue);
 
     return clone;
 };
 
 /**
- * Updates references within a list.
+ * Updates references within a dict.
  *
  * @param newReferences The set of new references {UUID: Object}.
  */
@@ -629,7 +623,7 @@ Sk.builtin.dict.prototype["updateReferencesInside"] = function(newReferences) {
             v = null;
         }
 
-        if (v && v.hasOwnProperty('_uuid') && newReferences.hasOwnProperty(v._uuid)) {
+        if (v && newReferences && v.hasOwnProperty('_uuid') && newReferences.hasOwnProperty(v._uuid)) {
             toChange.push({
                 key: k,
                 value: newReferences[v._uuid]

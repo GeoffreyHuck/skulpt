@@ -59,13 +59,11 @@ Sk.builtin.list = function (L, canSuspend, uuid) {
          * copied during the clone.
          */
 
-        this._parents = [];
+        this._parents = {};
         for (let idx in v) {
             const element = v[idx];
 
-            if (element.hasOwnProperty('_uuid')) {
-                element._parents[this._uuid] = this;
-            }
+            Sk.builtin.registerParentReferenceInChild(this, element);
         }
     } else {
         this._uuid = uuid;
@@ -743,14 +741,10 @@ Sk.builtin.list.prototype["clone"] = function(newElementValue) {
     clone._parents = this._parents;
 
     for (let it = Sk.abstr.iter(clone), k = it.tp$iternext(); k !== undefined; k = it.tp$iternext()) {
-        if (k.hasOwnProperty('_parents')) {
-            k._parents[clone._uuid] = clone;
-        }
+        Sk.builtin.registerParentReferenceInChild(clone, k);
     }
 
-    if (newElementValue && newElementValue.hasOwnProperty('_parents')) {
-        newElementValue._parents[clone._uuid] = clone;
-    }
+    Sk.builtin.registerParentReferenceInChild(clone, newElementValue);
 
     return clone;
 };

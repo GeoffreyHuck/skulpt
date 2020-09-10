@@ -36,6 +36,8 @@ Sk.builtin.slice = function slice (start, stop, step) {
                                       Sk.builtin.slice$stop, this.stop,
                                       Sk.builtin.slice$step, this.step]);
 
+    console.log("Sk.builtin.slice: reference ?");
+
     return this;
 };
 
@@ -155,8 +157,8 @@ Sk.builtin.slice.prototype["indices"] = new Sk.builtin.func(function (self, leng
     var sss = self.slice_indices_(length);
 
     return new Sk.builtin.tuple([
-        new Sk.builtin.int_(sss[0]), 
-        new Sk.builtin.int_(sss[1]), 
+        new Sk.builtin.int_(sss[0]),
+        new Sk.builtin.int_(sss[1]),
         new Sk.builtin.int_(sss[2])
     ]);
 });

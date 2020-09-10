@@ -1,3 +1,5 @@
+import {v4 as uuidv4} from "uuid";
+
 /**
  * @constructor
  * Sk.builtin.object
@@ -12,6 +14,21 @@ Sk.builtin.object = function () {
     if (!(this instanceof Sk.builtin.object)) {
         return new Sk.builtin.object();
     }
+
+    // Sets the UUID.
+    this._ref_uuid = uuidv4();
+    // if (uuid === undefined) {
+
+    /**
+     * This constructor is NOT called when an object is cloned.
+     * So the _uuid is always new.
+     */
+
+    this._uuid = uuidv4();
+
+    /**
+     * The internal dict $d doesn't exist here, so it's parent (this), is set elsewhere.
+     */
 
     return this;
 };
@@ -203,7 +220,7 @@ Sk.builtin.object.prototype.ob$type = Sk.builtin.type.makeIntoTypeObj("object", 
 Sk.builtin.object.prototype.ob$type.sk$klass = undefined;   // Nonsense for closure compiler
 Sk.builtin.object.prototype.tp$descr_set = undefined;   // Nonsense for closure compiler
 
-Sk.builtin.object.prototype["clone"] = function() {
+Sk.builtin.object.prototype["clone"] = function(newElementValue, clonedReferences) {
     /**
      * Warning : Only clone the content, not the reference itself.
      * Then only the internal dict will be persistent and not the object itself.
@@ -216,11 +233,38 @@ Sk.builtin.object.prototype["clone"] = function() {
     // Try to overcome to above warning.
     const newObject = Object.create(this);
 
-    if (this.hasOwnProperty("$d")) {
-        newObject["$d"] = this["$d"].clone();
+    // New reference id.
+    newObject._ref_uuid = uuidv4();
+
+    for (let idx in this) {
+        if (idx === '_ref_uuid') {
+            // Ignore.
+        }
+        else if (idx === '$d') {
+            if (!clonedReferences || !clonedReferences.hasOwnProperty(newObject.$d._uuid)) {
+                newObject.$d = newObject.$d.clone(newElementValue);
+                Sk.builtin.registerParentReferenceInChild(newObject, newObject.$d);
+            } else {
+                // If the internal dict has already been cloned, just copy it.
+                newObject.$d = clonedReferences[newObject.$d._uuid];
+            }
+        } else {
+            newObject[idx] = this[idx];
+        }
     }
-    //debugger;
+
     return newObject;
+};
+
+/**
+ * Updates references within an object.
+ *
+ * @param newReferences The set of new references {UUID: Object}.
+ */
+Sk.builtin.object.prototype["updateReferencesInside"] = function(newReferences) {
+    if (this.hasOwnProperty('$d') && newReferences.hasOwnProperty(this.$d._uuid)) {
+        this.$d = newReferences[this.$d._uuid];
+    }
 };
 
 /** Default implementations of dunder methods found in all Python objects */

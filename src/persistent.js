@@ -6,6 +6,38 @@
  */
 
 /**
+ * Register a promise reference.
+ *
+ * @param susp The suspension.
+ */
+Sk.builtin.registerPromiseReference = function(susp) {
+    if (susp && susp.child && susp.child.$tmps) {
+        var __selfArgName = susp.child._argnames[0];
+        if (susp.child.$tmps[__selfArgName] && susp.child.$tmps[__selfArgName]._uuid) {
+            window.currentPythonRunner._debugger.registerPromiseReference(susp.child.$tmps[__selfArgName]);
+        }
+    }
+};
+
+/**
+ * Register the parent reference of one of its child.
+ *
+ * @param parent The parent.
+ * @param child  The child.
+ */
+Sk.builtin.registerParentReferenceInChild = function(parent, child) {
+    if (!child || !parent || !child.hasOwnProperty('_uuid') || !parent.hasOwnProperty('_uuid')) {
+        return;
+    }
+
+    if (!child.hasOwnProperty('_parents')) {
+        child._parents = {};
+    }
+
+    child._parents[parent._uuid] = parent;
+};
+
+/**
  * Changes recursively all the references of an object.
  * At first call, parent is the object and obj is undefined.
  *
@@ -19,7 +51,11 @@
  */
 Sk.builtin.changeReferencesRec = function (clonedReferences, $loc, parent, obj, cycle) {
     if (!clonedReferences.hasOwnProperty(parent._uuid)) {
-        clonedReferences[parent._uuid] = parent.clone(obj);
+        clonedReferences[parent._uuid] = parent.clone(obj, clonedReferences);
+
+        if (parent.hasOwnProperty('$d')) {
+            clonedReferences[parent.$d._uuid] = parent.$d;
+        }
     }
 
     const parentClone = clonedReferences[parent._uuid];
@@ -35,6 +71,10 @@ Sk.builtin.changeReferencesRec = function (clonedReferences, $loc, parent, obj, 
 
     if (!cycle && parentClone._parents) {
         for (let parentUuid in parentClone._parents) {
+            if (clonedReferences.hasOwnProperty(parentUuid)) {
+                parentClone._parents[parentUuid] = clonedReferences[parentUuid];
+            }
+
             const parentParent = parentClone._parents[parentUuid];
 
             let cycle = false;
@@ -60,4 +100,5 @@ Sk.builtin.changeReferences = function (clonedReferences, $loc, obj) {
     return Sk.builtin.changeReferencesRec(clonedReferences, $loc, obj, undefined, false);
 };
 
+Sk.exportSymbol("Sk.builtin.registerParentReferenceInChild", Sk.builtin.registerParentReferenceInChild);
 Sk.exportSymbol("Sk.builtin.changeReferences", Sk.builtin.changeReferences);

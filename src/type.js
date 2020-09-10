@@ -144,6 +144,7 @@ Sk.builtin.type = function (name, bases, dict) {
             }
 
             this["$d"] = new Sk.builtin.dict([]);
+            Sk.builtin.registerParentReferenceInChild(this, this["$d"]);
             this["$d"].mp$ass_subscript(new Sk.builtin.str("__dict__"), this["$d"]);
         };
 
