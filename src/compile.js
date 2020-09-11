@@ -1033,7 +1033,6 @@ Compiler.prototype.vexpr = function (e, data, augvar, augsubs) {
                     this.generateNewReference(val, data);
 
                     out("$ret = Sk.abstr.sattr(", val, ",", mname, ",", data, ", true);");
-                    out("debugger;");
                     out("Sk.builtin.registerParentReferenceInChild(" + val + ", " + data + ");");
 
                     this.updateReferences(val);
