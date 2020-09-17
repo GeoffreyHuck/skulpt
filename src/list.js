@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
  * @extends Sk.builtin.object
  */
 Sk.builtin.list = function (L, canSuspend, uuid) {
-    var v, it, thisList;
+    var v, it, thisList, thisUuid;
 
     if (this instanceof Sk.builtin.list) {
         canSuspend = canSuspend || false;
@@ -34,8 +34,11 @@ Sk.builtin.list = function (L, canSuspend, uuid) {
                 if (i instanceof Sk.misceval.Suspension) {
                     return new Sk.misceval.Suspension(next, i);
                 } else if (i === undefined) {
+                    Sk.builtin.listInitPersistent(thisList, v, uuid);
+
                     // done!
                     thisList.v = v;
+
                     return thisList;
                 } else {
                     v.push(i);
@@ -47,27 +50,7 @@ Sk.builtin.list = function (L, canSuspend, uuid) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(L)+ "' " +"object is not iterable");
     }
 
-    // Sets the UUID.
-    this._ref_uuid = uuidv4();
-    if (uuid === undefined) {
-        this._uuid = uuidv4();
-
-        /*
-         * Set the parents.
-         *
-         * If uuid is provided, then it is a clone and the parents are
-         * copied during the clone.
-         */
-
-        this._parents = {};
-        for (let idx in v) {
-            const element = v[idx];
-
-            Sk.builtin.registerParentReferenceInChild(this, element);
-        }
-    } else {
-        this._uuid = uuid;
-    }
+    Sk.builtin.listInitPersistent(this, v, uuid);
 
     this.v = v;
 
@@ -76,6 +59,37 @@ Sk.builtin.list = function (L, canSuspend, uuid) {
 
 Sk.abstr.setUpInheritance("list", Sk.builtin.list, Sk.builtin.seqtype);
 Sk.abstr.markUnhashable(Sk.builtin.list);
+
+/**
+ * Initializes the persistent infos for a list.
+ *
+ * @param list   The list.
+ * @param values The values of the list.
+ * @param uuid   The uuid if it is a clone, or undefined.
+ */
+Sk.builtin.listInitPersistent = function(list, values, uuid) {
+    // Sets the UUID.
+    list._ref_uuid = uuidv4();
+    if (uuid === undefined) {
+        list._uuid = uuidv4();
+
+        /*
+         * Set the parents.
+         *
+         * If uuid is provided, then it is a clone and the parents are
+         * copied during the clone.
+         */
+
+        list._parents = {};
+        for (let idx in values) {
+            const element = values[idx];
+
+            Sk.builtin.registerParentReferenceInChild(list, element);
+        }
+    } else {
+        list._uuid = uuid;
+    }
+};
 
 Sk.builtin.list.prototype.list_concat_ = function (other) {
     // other not a list

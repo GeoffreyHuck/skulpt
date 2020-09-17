@@ -1262,6 +1262,7 @@ Sk.builtin.reversed = function reversed (seq) {
             this.idx = obj.sq$length() - 1;
             this.myobj = obj;
             this.getitem = Sk.abstr.lookupSpecial(obj, Sk.builtin.str.$getitem);
+            this.$__iterType = "reverseIter";
             this.tp$iter = function() {
                 return this;
             },
