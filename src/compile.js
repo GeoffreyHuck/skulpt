@@ -1028,8 +1028,6 @@ Compiler.prototype.vexpr = function (e, data, augvar, augsubs) {
                     this._checkSuspension(e);
                     break;
                 case Sk.astnodes.Store:
-                    out("console.log(" + val + ");");
-
                     this.generateNewReference(val, data);
 
                     out("$ret = Sk.abstr.sattr(", val, ",", mname, ",", data, ", true);");
@@ -1325,7 +1323,6 @@ Compiler.prototype.outputSuspensionHelpers = function (unit) {
             localSaveCode.push("\"" + t + "\":" + t);
             seenTemps[t]=true;
 
-            console.log(t);
             // Save references int $tmp.__refs__
 
             output += "if (" + t + " && " + t + " .hasOwnProperty('_uuid')) {";
@@ -2749,7 +2746,6 @@ Compiler.prototype.nameop = function (name, ctx, dataToStore) {
         case OP_GLOBAL:
             switch (ctx) {
                 case Sk.astnodes.Load:
-                    out("console.log('test2', '" + mangledNoPre + "');");
                     return this._gr("loadgbl", "Sk.misceval.loadname('", mangledNoPre, "',$gbl)");
                 case Sk.astnodes.Store:
                     // out("$gbl.", mangledNoPre, "=", dataToStore, ";");
