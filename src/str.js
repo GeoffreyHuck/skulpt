@@ -1,3 +1,5 @@
+import {v4 as uuidv4} from "uuid";
+
 Sk.builtin.interned = {};
 
 /**
@@ -9,6 +11,8 @@ Sk.builtin.str = function (x) {
     var ret;
 
     Sk.builtin.pyCheckArgsLen("str", arguments.length, 0, 1);
+
+    this._scalar_uuid = uuidv4();
 
     if (x === undefined) {
         x = "";

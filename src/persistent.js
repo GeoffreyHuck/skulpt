@@ -13,7 +13,7 @@
 Sk.builtin.registerPromiseReference = function(susp) {
     if (susp && susp.child && susp.child.$tmps) {
         var __selfArgName = susp.child._argnames[0];
-        if (susp.child.$tmps[__selfArgName] && susp.child.$tmps[__selfArgName]._uuid) {
+        if (susp.child.$tmps[__selfArgName] && susp.child.$tmps[__selfArgName].hasOwnProperty('_uuid')) {
             window.currentPythonRunner._debugger.registerPromiseReference(susp.child.$tmps[__selfArgName]);
         }
     }

@@ -5,6 +5,8 @@
  * @namespace Sk.builtin
  */
 
+import {v4 as uuidv4} from "uuid";
+
 /**
  * @constructor
  * Sk.builtin.int_
@@ -25,6 +27,8 @@
  * @return {(Sk.builtin.int_|Sk.builtin.lng)}      Python int (or long, if overflow)
  */
 Sk.builtin.int_ = function (x, base) {
+    this._scalar_uuid = uuidv4();
+
     var val;
     var func;
     var ret; // return value

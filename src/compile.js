@@ -18,7 +18,7 @@ function hookAffectation(mangled, dataToStore, debug) {
 
     // TO :   $loc.varName = window.currentPythonRunner.reportValue(value, 'varName');
     var varName = mangled.substr(5);
-    out("if (" + dataToStore + "._uuid) {");
+    out("if (" + dataToStore + ".hasOwnProperty('_uuid')) {");
     out("  $loc.__refs__ = ($loc.hasOwnProperty('__refs__')) ? $loc.__refs__ : [];");
     out("  if (!$loc.__refs__.hasOwnProperty(" + dataToStore + "._uuid)) {");
     out("    $loc.__refs__[" + dataToStore + "._uuid] = [];");
@@ -27,32 +27,6 @@ function hookAffectation(mangled, dataToStore, debug) {
     out("}");
 
     out(mangled, "=", "window.currentPythonRunner.reportValue(", dataToStore, ", '", varName, "');");
-}
-
-function hookGr(v, args) {
-    /*
-    var args = "";
-    for (i = 1; i < arguments.length; ++i) {
-        args += " " + arguments[i] + ", ";
-    }
-    console.log("HOOK_GR : " + v + "  = " + args);
-    */
-
-    // FROM :
-    // out("var ", v, "=");
-    // for (i = 1; i < arguments.length; ++i) {
-    //     out(arguments[i]);
-    // }
-    // out(";");
-
-    // TO :
-
-    out("var ", v, "=");
-    for (let i = 1; i < args.length; ++i) {
-        out(args[i]);
-    }
-    out(";");
-    //out("console.log('var '" + v + "'='," + arguments + ")");
 }
 
 /**
@@ -164,6 +138,7 @@ Compiler.prototype.annotateSource = function (ast) {
 
         Sk.asserts.assert(ast.lineno !== undefined && ast.col_offset !== undefined);
         out("$currLineNo = ", lineno, ";\n$currColNo = ", col_offset, ";\n\n");
+        out("var $__loaded_references = {};");
     }
 };
 
@@ -354,7 +329,33 @@ Compiler.prototype._gr = function (hint, rest) {
     var v = this.gensym(hint);
     this.u.localtemps.push(v);
 
-    hookGr(v, arguments);
+    out("var ", v, "=");
+    for (let i = 1; i < arguments.length; ++i) {
+        out(arguments[i]);
+    }
+    out(";");
+
+    if (hint === "loadname") {
+        out("if (" + v + ".hasOwnProperty('_uuid')) {");
+        out("  $__loaded_references[" + v + "._uuid] = true;");
+        out("    if (" + v + ".hasOwnProperty('$d')) {");
+        out("      $__loaded_references[" + v + ".$d._uuid] = true;");
+        out("    }");
+        out("} else if (" + v + ".hasOwnProperty('_scalar_uuid')) {");
+        out("  $__loaded_references[" + v + "._scalar_uuid] = true;");
+        out("}");
+    } else if (hint === "lsubscr" || hint === "gitem" || hint === "lattr") {
+        out("if (typeof $ret !== 'undefined') {");
+        out("  if ($ret.hasOwnProperty('_uuid')) {");
+        out("    $__loaded_references[$ret._uuid] = true;");
+        out("    if ($ret.hasOwnProperty('$d')) {");
+        out("      $__loaded_references[$ret.$d._uuid] = true;");
+        out("    }");
+        out("  } else if ($ret.hasOwnProperty('_scalar_uuid')) {");
+        out("    $__loaded_references[$ret._scalar_uuid] = true;");
+        out("  }");
+        out("}");
+    }
 
     return v;
 };
@@ -375,6 +376,9 @@ Compiler.prototype.outputInterruptTest = function () { // Added by RNL
             output += "var $susp = $saveSuspension({data: {type: 'Sk.yield'}, resume: function() {}}, '"+this.filename+"',$currLineNo,$currColNo);";
             output += "$susp.$blk = $blk;";
             output += "$susp.optional = true;";
+            output += "if ($__loaded_references) {";
+            output += "$susp.$loaded_references = $__loaded_references;";
+            output += "}";
             output += "return $susp;";
             output += "}";
             this.u.doesSuspend = true;
@@ -1471,6 +1475,9 @@ Compiler.prototype.cwhile = function (s) {
                 "var $susp = $saveSuspension({data: {type: '"+suspType+"'}, resume: function() {}}, '"+this.filename+"',"+s.lineno+","+s.col_offset+");",
                 "$susp.$blk = "+debugBlock+";",
                 "$susp.optional = true;",
+                "if ($__loaded_references) {",
+                "  $susp.$loaded_references = $__loaded_references;",
+                "}",
                 "return $susp;",
                 "}");
             this._jump(debugBlock);
@@ -1540,6 +1547,9 @@ Compiler.prototype.cfor = function (s) {
             "var $susp = $saveSuspension({data: {type: '"+suspType+"'}, resume: function() {}}, '"+this.filename+"',"+s.lineno+","+s.col_offset+");",
             "$susp.$blk = "+debugBlock+";",
             "$susp.optional = true;",
+            "if ($__loaded_references) {",
+            "  $susp.$loaded_references = $__loaded_references;",
+            "}",
             "return $susp;",
             "}");
         this._jump(debugBlock);
@@ -2521,6 +2531,9 @@ Compiler.prototype.vstmt = function (s, class_for_super) {
             "var $susp = $saveSuspension({data: {type: 'Sk.debug'}, resume: function() {}}, '"+this.filename+"',"+s.lineno+","+s.col_offset+");",
             "$susp.$blk = " + debugBlock + ";",
             "$susp.optional = true;",
+            "if ($__loaded_references) {",
+            "  $susp.$loaded_references = $__loaded_references;",
+            "}",
             "return $susp;",
             "}");
         this._jump(debugBlock);
@@ -2728,7 +2741,6 @@ Compiler.prototype.nameop = function (name, ctx, dataToStore) {
             switch (ctx) {
                 case Sk.astnodes.Load:
                     // can't be || for loc.x = 0 or null
-
                     return this._gr("loadname", mangled, "!==undefined?", mangled, ":Sk.misceval.loadname('", mangledNoPre, "',$gbl);");
                 case Sk.astnodes.Store:
                     // out(mangled, "=", dataToStore, ";");

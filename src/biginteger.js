@@ -38,6 +38,8 @@
 
 
 // (public) Constructor
+import {v4 as uuidv4} from "uuid";
+
 /**
  * @constructor
  * @param {number|string|null} a
@@ -45,6 +47,8 @@
  * @param {*=} c
  */
 Sk.builtin.biginteger = function (a, b, c) {
+    this._scalar_uuid = uuidv4();
+
     if (a != null) {
         if ("number" == typeof a) {
             this.fromNumber(a, b, c);

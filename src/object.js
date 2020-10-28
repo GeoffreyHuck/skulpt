@@ -17,7 +17,6 @@ Sk.builtin.object = function () {
 
     // Sets the UUID.
     this._ref_uuid = uuidv4();
-    // if (uuid === undefined) {
 
     /**
      * This constructor is NOT called when an object is cloned.

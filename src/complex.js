@@ -1,3 +1,5 @@
+import {v4 as uuidv4} from "uuid";
+
 /**
  * hypot is a ESCMA6 function and maybe not available across all browsers
  */
@@ -28,6 +30,8 @@ Math.hypot = Math.hypot || function() {
  */
 Sk.builtin.complex = function (real, imag) {
     Sk.builtin.pyCheckArgsLen("complex", arguments.length, 0, 2);
+
+    this._scalar_uuid = uuidv4();
 
     var r, i, tmp; // PyObject
     var nbr, nbi; // real, imag as numbers

@@ -2,6 +2,8 @@
  * @namespace Sk.builtin
  */
 
+import {v4 as uuidv4} from "uuid";
+
 /**
  * @constructor
  * Sk.builtin.float_
@@ -15,6 +17,8 @@
  * @return {Sk.builtin.float_} Python float
  */
 Sk.builtin.float_ = function (x) {
+    this._scalar_uuid = uuidv4();
+
     var tmp;
     if (x === undefined) {
         return new Sk.builtin.float_(0.0);
@@ -888,7 +892,7 @@ Sk.builtin.float_.prototype.str$ = function (base, sign) {
         } else {
             tmp = work.toPrecision(12);
         }
-        
+
 
         // transform fractions with 4 or more leading zeroes into exponents
         idx = tmp.indexOf(".");
