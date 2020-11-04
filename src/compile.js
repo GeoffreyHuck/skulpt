@@ -3,32 +3,6 @@ var out;
 
 Sk.gensymcount = 0;
 
-function hookAffectation(mangled, dataToStore, debug) {
-    // console.log("HOOK_AFFECTATION : " + debug + " [" + mangled + "     =      " + dataToStore + "]");
-
-    // FROM : $loc.varName = value;
-    // out(mangled, "=", dataToStore, ";");
-
-    // If doesn't start with $loc.
-    if (mangled.substr(0, 5) !== "$loc.") {
-        out(mangled, "=", dataToStore, ";");
-
-        return;
-    }
-
-    // TO :   $loc.varName = window.currentPythonRunner.reportValue(value, 'varName');
-    var varName = mangled.substr(5);
-    out("if (" + dataToStore + ".hasOwnProperty('_uuid')) {");
-    out("  $loc.__refs__ = ($loc.hasOwnProperty('__refs__')) ? $loc.__refs__ : [];");
-    out("  if (!$loc.__refs__.hasOwnProperty(" + dataToStore + "._uuid)) {");
-    out("    $loc.__refs__[" + dataToStore + "._uuid] = [];");
-    out("  }");
-    out("  $loc.__refs__[" + dataToStore + "._uuid].push(\"" + varName + "\");");
-    out("}");
-
-    out(mangled, "=", "window.currentPythonRunner.reportValue(", dataToStore, ", '", varName, "');");
-}
-
 /**
  * @constructor
  * @param {string} filename
@@ -336,25 +310,10 @@ Compiler.prototype._gr = function (hint, rest) {
     out(";");
 
     if (hint === "loadname") {
-        out("if (" + v + ".hasOwnProperty('_uuid')) {");
-        out("  $__loaded_references[" + v + "._uuid] = true;");
-        out("    if (" + v + ".hasOwnProperty('$d')) {");
-        out("      $__loaded_references[" + v + ".$d._uuid] = true;");
-        out("    }");
-        out("} else if (" + v + ".hasOwnProperty('_scalar_uuid')) {");
-        out("  $__loaded_references[" + v + "._scalar_uuid] = true;");
-        out("}");
+        this.markLoadedName(arguments[5]); // 5th argument is the variable's name.
+        this.markLoadedReference(v);
     } else if (hint === "lsubscr" || hint === "gitem" || hint === "lattr") {
-        out("if (typeof $ret !== 'undefined') {");
-        out("  if ($ret.hasOwnProperty('_uuid')) {");
-        out("    $__loaded_references[$ret._uuid] = true;");
-        out("    if ($ret.hasOwnProperty('$d')) {");
-        out("      $__loaded_references[$ret.$d._uuid] = true;");
-        out("    }");
-        out("  } else if ($ret.hasOwnProperty('_scalar_uuid')) {");
-        out("    $__loaded_references[$ret._scalar_uuid] = true;");
-        out("  }");
-        out("}");
+        this.markLoadedReference("$ret");
     }
 
     return v;
@@ -795,6 +754,7 @@ Compiler.prototype.vslice = function (s, ctx, obj, dataToStore) {
 Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
     if (ctx === Sk.astnodes.Load || ctx === Sk.astnodes.AugLoad) {
         out("$ret = Sk.abstr.objectGetItem(", obj, ",", subs, ", true);");
+        this.markLoadedElement(obj, subs);
         this._checkSuspension();
         return this._gr("lsubscr", "$ret");
     }
@@ -814,6 +774,66 @@ Compiler.prototype.chandlesubscr = function (ctx, obj, subs, data) {
     else {
         Sk.asserts.fail("handlesubscr fail");
     }
+};
+
+Compiler.prototype.hookAffectation = function (mangled, dataToStore, debug) {
+    // console.log("HOOK_AFFECTATION : " + debug + " [" + mangled + "     =      " + dataToStore + "]");
+
+    // FROM : $loc.varName = value;
+    // out(mangled, "=", dataToStore, ";");
+
+    // If doesn't start with $loc.
+    if (mangled.substr(0, 5) !== "$loc.") {
+        out(mangled, "=", dataToStore, ";");
+
+        return;
+    }
+
+    // TO :   $loc.varName = window.currentPythonRunner.reportValue(value, 'varName');
+    var varName = mangled.substr(5);
+    out("if (" + dataToStore + ".hasOwnProperty('_uuid')) {");
+    out("  $loc.__refs__ = ($loc.hasOwnProperty('__refs__')) ? $loc.__refs__ : [];");
+    out("  if (!$loc.__refs__.hasOwnProperty(" + dataToStore + "._uuid)) {");
+    out("    $loc.__refs__[" + dataToStore + "._uuid] = [];");
+    out("  }");
+    out("  $loc.__refs__[" + dataToStore + "._uuid].push(\"" + varName + "\");");
+    out("}");
+
+    out(mangled, "=", "window.currentPythonRunner.reportValue(", dataToStore, ", '", varName, "');");
+};
+
+/**
+ * Marks a name as loaded.
+ *
+ * @param varName The variable name.
+ */
+Compiler.prototype.markLoadedName = function(varName) {
+    out("$__loaded_references['" + varName + "'] = true;");
+};
+
+Compiler.prototype.markLoadedElement = function(obj, subs) {
+    out("$__loaded_references[" + obj + "._uuid + '_' + " + subs + ".v] = true;");
+
+    // Also mark the internal dict of an object if it's an object.
+    out("if (" + obj + ".hasOwnProperty('$d')) {");
+    out("  $__loaded_references[" + obj + ".$d._uuid + '_' + " + subs + ".v] = true;");
+    out("}");
+};
+
+/**
+ * Marks a reference as loaded.
+ *
+ * @param varName The variable name.
+ */
+Compiler.prototype.markLoadedReference = function(varName) {
+    out("if (typeof " + varName + " !== 'undefined') {");
+    out("  if (" + varName + ".hasOwnProperty('_uuid')) {");
+    out("    $__loaded_references[" + varName + "._uuid] = true;");
+    out("    if (" + varName + ".hasOwnProperty('$d')) {");
+    out("      $__loaded_references[" + varName + ".$d._uuid] = true;");
+    out("    }");
+    out("  }");
+    out("}");
 };
 
 /**
@@ -1014,10 +1034,12 @@ Compiler.prototype.vexpr = function (e, data, augvar, augsubs) {
             switch (e.ctx) {
                 case Sk.astnodes.AugLoad:
                     out("$ret = Sk.abstr.gattr(", augvar, ",", mname, ", true);");
+                    this.markLoadedElement(augvar, mname);
                     this._checkSuspension(e);
                     return this._gr("lattr", "$ret");
                 case Sk.astnodes.Load:
                     out("$ret = Sk.abstr.gattr(", val, ",", mname, ", true);");
+                    this.markLoadedElement(val, mname);
                     this._checkSuspension(e);
                     return this._gr("lattr", "$ret");
                 case Sk.astnodes.AugStore:
@@ -1053,6 +1075,7 @@ Compiler.prototype.vexpr = function (e, data, augvar, augsubs) {
             switch (e.ctx) {
                 case Sk.astnodes.AugLoad:
                     out("$ret = Sk.abstr.objectGetItem(",augvar,",",augsubs,", true);");
+                    this.markLoadedElement(augvar, augsubs);
                     this._checkSuspension(e)
                     return this._gr("gitem", "$ret");
                 case Sk.astnodes.Load:
@@ -2728,7 +2751,7 @@ Compiler.prototype.nameop = function (name, ctx, dataToStore) {
                     return mangled;
                 case Sk.astnodes.Store:
                     // out(mangled, "=", dataToStore, ";");
-                    hookAffectation(mangled, dataToStore, '1');
+                    this.hookAffectation(mangled, dataToStore, "1");
                     break;
                 case Sk.astnodes.Del:
                     out("delete ", mangled, ";");
@@ -2744,7 +2767,7 @@ Compiler.prototype.nameop = function (name, ctx, dataToStore) {
                     return this._gr("loadname", mangled, "!==undefined?", mangled, ":Sk.misceval.loadname('", mangledNoPre, "',$gbl);");
                 case Sk.astnodes.Store:
                     // out(mangled, "=", dataToStore, ";");
-                    hookAffectation(mangled, dataToStore, '2');
+                    this.hookAffectation(mangled, dataToStore, "2");
                     break;
                 case Sk.astnodes.Del:
                     out("delete ", mangled, ";");
@@ -2761,7 +2784,7 @@ Compiler.prototype.nameop = function (name, ctx, dataToStore) {
                     return this._gr("loadgbl", "Sk.misceval.loadname('", mangledNoPre, "',$gbl)");
                 case Sk.astnodes.Store:
                     // out("$gbl.", mangledNoPre, "=", dataToStore, ";");
-                    hookAffectation("$gbl." + mangledNoPre, dataToStore, '3');
+                    this.hookAffectation("$gbl." + mangledNoPre, dataToStore, "3");
                     break;
                 case Sk.astnodes.Del:
                     out("delete $gbl.", mangledNoPre);
@@ -2776,7 +2799,7 @@ Compiler.prototype.nameop = function (name, ctx, dataToStore) {
                     return dict + "." + mangledNoPre;
                 case Sk.astnodes.Store:
                     // out(dict, ".", mangledNoPre, "=", dataToStore, ";");
-                    hookAffectation(dict + "." + mangledNoPre, dataToStore, '4');
+                    this.hookAffectation(dict + "." + mangledNoPre, dataToStore, "4");
                     break;
                 case Sk.astnodes.Param:
                     return mangledNoPre;

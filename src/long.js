@@ -3,7 +3,6 @@
 // long aka "bignumber" implementation
 //
 //  Using javascript BigInteger by Tom Wu
-import {v4 as uuidv4} from "uuid";
 
 /**
  * @constructor
@@ -19,8 +18,6 @@ import {v4 as uuidv4} from "uuid";
  * @return {Sk.builtin.lng} Python long
  */
 Sk.builtin.lng = function (x, base) {   /* long is a reserved word */
-    this._scalar_uuid = uuidv4();
-
     base = Sk.builtin.asnum$(base);
     if (!(this instanceof Sk.builtin.lng)) {
         return new Sk.builtin.lng(x, base);

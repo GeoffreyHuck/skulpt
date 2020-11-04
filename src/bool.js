@@ -1,5 +1,3 @@
-import {v4 as uuidv4} from "uuid";
-
 /**
  * @constructor
  * Sk.builtin.bool
@@ -24,8 +22,6 @@ Sk.builtin.bool = function (x) {
     } else {
         bool = Sk.builtin.bool.false$;
     }
-
-    bool._scalar_uuid = uuidv4();
 
     return bool;
 };

@@ -2,8 +2,6 @@
  * @namespace Sk.builtin
  */
 
-import {v4 as uuidv4} from "uuid";
-
 /**
  * @constructor
  * Sk.builtin.float_
@@ -17,8 +15,6 @@ import {v4 as uuidv4} from "uuid";
  * @return {Sk.builtin.float_} Python float
  */
 Sk.builtin.float_ = function (x) {
-    this._scalar_uuid = uuidv4();
-
     var tmp;
     if (x === undefined) {
         return new Sk.builtin.float_(0.0);
