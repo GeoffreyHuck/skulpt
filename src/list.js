@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+const uuidv4 = require("uuid").v4;
 
 /**
  * @constructor
@@ -715,7 +715,7 @@ Sk.builtin.list.prototype["updateReferencesInside"] = function(newReferences) {
     const toChange = {};
 
     for (let it = Sk.abstr.iter(this), k = it.tp$iternext(); k !== undefined; k = it.tp$iternext()) {
-        if (k.hasOwnProperty('_uuid') && newReferences.hasOwnProperty(k._uuid)) {
+        if (k.hasOwnProperty("_uuid") && newReferences.hasOwnProperty(k._uuid)) {
             toChange[it.$index - 1] = newReferences[k._uuid];
         }
     }
@@ -734,9 +734,9 @@ Sk.builtin.list.prototype["clone"] = function(newElementValue) {
     const thisInKeys = [];
     let items = [];
     for (let it = Sk.abstr.iter(this), k = it.tp$iternext(); k !== undefined; k = it.tp$iternext()) {
-        if (newElementValue.hasOwnProperty('_uuid') && k.hasOwnProperty('_uuid') && newElementValue._uuid === k._uuid) {
+        if (newElementValue.hasOwnProperty("_uuid") && k.hasOwnProperty("_uuid") && newElementValue._uuid === k._uuid) {
             items.push(newElementValue);
-        } else if (k.hasOwnProperty('_uuid') && k._uuid === this._uuid) {
+        } else if (k.hasOwnProperty("_uuid") && k._uuid === this._uuid) {
             thisInKeys.push(it.$index - 1);
 
             items.push(this);

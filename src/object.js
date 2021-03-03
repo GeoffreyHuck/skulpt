@@ -1,4 +1,4 @@
-import {v4 as uuidv4} from "uuid";
+const uuidv4 = require("uuid").v4;
 
 /**
  * @constructor
@@ -236,10 +236,9 @@ Sk.builtin.object.prototype["clone"] = function(newElementValue, clonedReference
     newObject._ref_uuid = uuidv4();
 
     for (let idx in this) {
-        if (idx === '_ref_uuid') {
+        if (idx === "_ref_uuid") {
             // Ignore.
-        }
-        else if (idx === '$d') {
+        } else if (idx === "$d") {
             if (!clonedReferences || !clonedReferences.hasOwnProperty(newObject.$d._uuid)) {
                 newObject.$d = newObject.$d.clone(newElementValue);
                 Sk.builtin.registerParentReferenceInChild(newObject, newObject.$d);
@@ -261,7 +260,7 @@ Sk.builtin.object.prototype["clone"] = function(newElementValue, clonedReference
  * @param newReferences The set of new references {UUID: Object}.
  */
 Sk.builtin.object.prototype["updateReferencesInside"] = function(newReferences) {
-    if (this.hasOwnProperty('$d') && newReferences.hasOwnProperty(this.$d._uuid)) {
+    if (this.hasOwnProperty("$d") && newReferences.hasOwnProperty(this.$d._uuid)) {
         this.$d = newReferences[this.$d._uuid];
     }
 };

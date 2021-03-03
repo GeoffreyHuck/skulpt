@@ -13,7 +13,7 @@
 Sk.builtin.registerPromiseReference = function(susp) {
     if (susp && susp.child && susp.child.$tmps) {
         var __selfArgName = susp.child._argnames[0];
-        if (susp.child.$tmps[__selfArgName] && susp.child.$tmps[__selfArgName].hasOwnProperty('_uuid')) {
+        if (susp.child.$tmps[__selfArgName] && susp.child.$tmps[__selfArgName].hasOwnProperty("_uuid")) {
             window.currentPythonRunner._debugger.registerPromiseReference(susp.child.$tmps[__selfArgName]);
         }
     }
@@ -26,11 +26,11 @@ Sk.builtin.registerPromiseReference = function(susp) {
  * @param child  The child.
  */
 Sk.builtin.registerParentReferenceInChild = function(parent, child) {
-    if (!child || !parent || !child.hasOwnProperty('_uuid') || !parent.hasOwnProperty('_uuid')) {
+    if (!child || !parent || !child.hasOwnProperty("_uuid") || !parent.hasOwnProperty("_uuid")) {
         return;
     }
 
-    if (!child.hasOwnProperty('_parents')) {
+    if (!child.hasOwnProperty("_parents")) {
         child._parents = {};
     }
 
@@ -53,7 +53,7 @@ Sk.builtin.changeReferencesRec = function (clonedReferences, $loc, parent, obj, 
     if (!clonedReferences.hasOwnProperty(parent._uuid)) {
         clonedReferences[parent._uuid] = parent.clone(obj, clonedReferences);
 
-        if (parent.hasOwnProperty('$d')) {
+        if (parent.hasOwnProperty("$d")) {
             clonedReferences[parent.$d._uuid] = parent.$d;
         }
     }

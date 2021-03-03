@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+const uuidv4 = require("uuid").v4;
 
 /**
  * @constructor
@@ -577,9 +577,9 @@ Sk.builtin.dict.prototype["clone"] = function(newElementValue) {
             v = null;
         }
 
-        if (v && newElementValue && newElementValue.hasOwnProperty('_uuid') && v.hasOwnProperty('_uuid') && newElementValue._uuid === v._uuid) {
+        if (v && newElementValue && newElementValue.hasOwnProperty("_uuid") && v.hasOwnProperty("_uuid") && newElementValue._uuid === v._uuid) {
             clone.mp$ass_subscript(k, newElementValue);
-        } else if (v && v.hasOwnProperty('_uuid') && v._uuid === this._uuid) {
+        } else if (v && v.hasOwnProperty("_uuid") && v._uuid === this._uuid) {
             thisInKeys.push(k);
 
             clone.mp$ass_subscript(k, this);
@@ -623,7 +623,7 @@ Sk.builtin.dict.prototype["updateReferencesInside"] = function(newReferences) {
             v = null;
         }
 
-        if (v && newReferences && v.hasOwnProperty('_uuid') && newReferences.hasOwnProperty(v._uuid)) {
+        if (v && newReferences && v.hasOwnProperty("_uuid") && newReferences.hasOwnProperty(v._uuid)) {
             toChange.push({
                 key: k,
                 value: newReferences[v._uuid]
